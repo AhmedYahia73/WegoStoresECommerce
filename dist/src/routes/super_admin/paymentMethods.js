@@ -1,0 +1,16 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const paymentMethods_1 = require("../../controllers/super_admin/paymentMethods");
+const catchAsync_1 = require("../../utils/catchAsync");
+const validation_1 = require("../../middlewares/validation");
+const checkpermission_1 = require("../../middlewares/checkpermission");
+const paymentMethods_2 = require("../../validators/super_admin/paymentMethods");
+const router = (0, express_1.Router)();
+router.get("/", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(paymentMethods_1.getAllPaymentMethods));
+router.get("/select", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(paymentMethods_1.getPaymentMethodsSelection));
+router.get("/:id", (0, checkpermission_1.checkOnlyAdmin)(), (0, validation_1.validate)(paymentMethods_2.paymentMethodIdParamSchema), (0, catchAsync_1.catchAsync)(paymentMethods_1.getPaymentMethodById));
+router.post("/", (0, checkpermission_1.checkOnlyAdmin)(), (0, validation_1.validate)(paymentMethods_2.createPaymentMethodSchema), (0, catchAsync_1.catchAsync)(paymentMethods_1.createPaymentMethod));
+router.put("/:id", (0, checkpermission_1.checkOnlyAdmin)(), (0, validation_1.validate)(paymentMethods_2.updatePaymentMethodSchema), (0, catchAsync_1.catchAsync)(paymentMethods_1.updatePaymentMethod));
+router.delete("/:id", (0, checkpermission_1.checkOnlyAdmin)(), (0, validation_1.validate)(paymentMethods_2.paymentMethodIdParamSchema), (0, catchAsync_1.catchAsync)(paymentMethods_1.deletePaymentMethod));
+exports.default = router;

@@ -1,0 +1,16 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const users_1 = require("../../controllers/super_admin/users");
+const catchAsync_1 = require("../../utils/catchAsync");
+const validation_1 = require("../../middlewares/validation");
+const checkpermission_1 = require("../../middlewares/checkpermission");
+const users_2 = require("../../validators/super_admin/users");
+const router = (0, express_1.Router)();
+router.get("/", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(users_1.getAllUsers));
+router.get("/select", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(users_1.getUsersSelection));
+router.get("/:id", (0, checkpermission_1.checkOnlyAdmin)(), (0, validation_1.validate)(users_2.userIdParamSchema), (0, catchAsync_1.catchAsync)(users_1.getUserById));
+router.post("/", (0, checkpermission_1.checkOnlyAdmin)(), (0, validation_1.validate)(users_2.createUserSchema), (0, catchAsync_1.catchAsync)(users_1.createUser));
+router.put("/:id", (0, checkpermission_1.checkOnlyAdmin)(), (0, validation_1.validate)(users_2.updateUserSchema), (0, catchAsync_1.catchAsync)(users_1.updateUser));
+router.delete("/:id", (0, checkpermission_1.checkOnlyAdmin)(), (0, validation_1.validate)(users_2.userIdParamSchema), (0, catchAsync_1.catchAsync)(users_1.deleteUser));
+exports.default = router;

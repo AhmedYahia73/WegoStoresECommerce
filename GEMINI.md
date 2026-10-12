@@ -2,11 +2,15 @@
 
 Always follow these rules automatically across all conversations in this project:
 
-## 1. Database & Schema Structure (`src/models/`)
-- **Multi-Tenancy Architecture**:
-  - Central schema tables (Super Admin) live in `src/models/central/` with **each table in a separate file** (e.g., `users.ts`, `packages.ts`, `paymentMethods.ts`, `admins.ts`, `orders.ts`).
-  - Sub-schemas (Tenant schemas) live in their dedicated folder inside `src/models/` with each table in a separate file.
-  - All central/schema tables are re-exported in `src/models/schema.ts`.
+## 1. Projects Structure
+- **Central Project (`E:\ECommerce`)**:
+  - Super Admin project managing central operations, tenants (`users`), subscription packages, payment methods, and global orders.
+  - Central schema tables live in `src/models/central/` with each table in a separate file (`users.ts`, `packages.ts`, `paymentMethods.ts`, `admins.ts`, `orders.ts`).
+  - Re-exported in `src/models/schema.ts`.
+- **Sub-Admin Project (`E:\SubAdminECommerce`)**:
+  - Tenant Multi-Tenancy project where each tenant has their own wildcard schema.
+  - Tenant schema tables live in `E:\SubAdminECommerce\src\models\tenant/` with each table in a separate file:
+    `customers.ts`, `categories.ts`, `brands.ts`, `discounts.ts`, `flashDiscounts.ts`, `popups.ts`, `warranties.ts`, `taxes.ts`, `roles.ts`, `permissions.ts`, `staff.ts`, `paymentMethods.ts`, `products.ts`, `attributes.ts`, `values.ts`, `productAttributes.ts`, `productValues.ts`, `cities.ts`, `zones.ts`, `addresses.ts`, `languages.ts`.
 - Primary keys use `char("id", { length: 36 }).primaryKey().default(sql\`(UUID())\`)`.
 
 ## 2. CRUD & Folder Conventions (`controllers`, `validators`, `routes`)
