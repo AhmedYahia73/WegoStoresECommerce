@@ -608,6 +608,134 @@ export const TENANT_TABLE_DEFINITIONS: TableDef[] = [
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `,
   },
+
+  // 22. Gedia (gedia)
+  {
+    name: "gedia",
+    columns: [
+      { name: "id", definition: "CHAR(36) PRIMARY KEY DEFAULT (UUID())" },
+      { name: "name", definition: "JSON NOT NULL" },
+      { name: "logo", definition: "VARCHAR(500) NOT NULL" },
+      { name: "public_key", definition: "TEXT NOT NULL" },
+      { name: "api_password", definition: "TEXT NOT NULL" },
+      { name: "environment", definition: "ENUM('egypt', 'saudi_arabia', 'uae') NOT NULL DEFAULT 'egypt'" },
+      { name: "status", definition: "BOOLEAN NOT NULL DEFAULT 1" },
+      { name: "callback_url", definition: "VARCHAR(500) DEFAULT '{subdomain}/api/gedia_callback'" },
+      { name: "created_at", definition: "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP" },
+      { name: "updated_at", definition: "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" },
+    ],
+    createSql: (db) => `
+      CREATE TABLE IF NOT EXISTS \`${db}\`.\`gedia\` (
+        \`id\` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+        \`name\` JSON NOT NULL,
+        \`logo\` VARCHAR(500) NOT NULL,
+        \`public_key\` TEXT NOT NULL,
+        \`api_password\` TEXT NOT NULL,
+        \`environment\` ENUM('egypt', 'saudi_arabia', 'uae') NOT NULL DEFAULT 'egypt',
+        \`status\` BOOLEAN NOT NULL DEFAULT 1,
+        \`callback_url\` VARCHAR(500) DEFAULT '{subdomain}/api/gedia_callback',
+        \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+  },
+
+  // 23. Paymob (paymob)
+  {
+    name: "paymob",
+    columns: [
+      { name: "id", definition: "CHAR(36) PRIMARY KEY DEFAULT (UUID())" },
+      { name: "name", definition: "JSON NOT NULL" },
+      { name: "logo", definition: "VARCHAR(500) NOT NULL" },
+      { name: "api_key", definition: "TEXT NOT NULL" },
+      { name: "iframe_id", definition: "VARCHAR(255) NOT NULL" },
+      { name: "integration_id", definition: "VARCHAR(255) NOT NULL" },
+      { name: "hmac", definition: "TEXT NOT NULL" },
+      { name: "type", definition: "ENUM('test', 'live') NOT NULL DEFAULT 'test'" },
+      { name: "status", definition: "BOOLEAN NOT NULL DEFAULT 1" },
+      { name: "callback_url", definition: "VARCHAR(500) DEFAULT '{subdomain}/api/paymob_callback'" },
+      { name: "created_at", definition: "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP" },
+      { name: "updated_at", definition: "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" },
+    ],
+    createSql: (db) => `
+      CREATE TABLE IF NOT EXISTS \`${db}\`.\`paymob\` (
+        \`id\` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+        \`name\` JSON NOT NULL,
+        \`logo\` VARCHAR(500) NOT NULL,
+        \`api_key\` TEXT NOT NULL,
+        \`iframe_id\` VARCHAR(255) NOT NULL,
+        \`integration_id\` VARCHAR(255) NOT NULL,
+        \`hmac\` TEXT NOT NULL,
+        \`type\` ENUM('test', 'live') NOT NULL DEFAULT 'test'" },
+        \`status\` BOOLEAN NOT NULL DEFAULT 1,
+        \`callback_url\` VARCHAR(500) DEFAULT '{subdomain}/api/paymob_callback',
+        \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+  },
+
+  // 24. Kashier (kashier)
+  {
+    name: "kashier",
+    columns: [
+      { name: "id", definition: "CHAR(36) PRIMARY KEY DEFAULT (UUID())" },
+      { name: "name", definition: "JSON NOT NULL" },
+      { name: "logo", definition: "VARCHAR(500) NOT NULL" },
+      { name: "api_key", definition: "TEXT NOT NULL" },
+      { name: "secret_key", definition: "TEXT NOT NULL" },
+      { name: "merchant_id", definition: "TEXT NOT NULL" },
+      { name: "status", definition: "BOOLEAN NOT NULL DEFAULT 1" },
+      { name: "callback_url", definition: "VARCHAR(500) DEFAULT '{subdomain}/api/kashier_callback'" },
+      { name: "created_at", definition: "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP" },
+      { name: "updated_at", definition: "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" },
+    ],
+    createSql: (db) => `
+      CREATE TABLE IF NOT EXISTS \`${db}\`.\`kashier\` (
+        \`id\` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+        \`name\` JSON NOT NULL,
+        \`logo\` VARCHAR(500) NOT NULL,
+        \`api_key\` TEXT NOT NULL,
+        \`secret_key\` TEXT NOT NULL,
+        \`merchant_id\` TEXT NOT NULL,
+        \`status\` BOOLEAN NOT NULL DEFAULT 1,
+        \`callback_url\` VARCHAR(500) DEFAULT '{subdomain}/api/kashier_callback',
+        \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+  },
+
+  // 25. Fawry (fawry)
+  {
+    name: "fawry",
+    columns: [
+      { name: "id", definition: "CHAR(36) PRIMARY KEY DEFAULT (UUID())" },
+      { name: "name", definition: "JSON NOT NULL" },
+      { name: "logo", definition: "VARCHAR(500) NOT NULL" },
+      { name: "merchant_code", definition: "TEXT NULL" },
+      { name: "merchant_secret_key", definition: "TEXT NOT NULL" },
+      { name: "fawry_base_url", definition: "ENUM('Staging', 'Live') NOT NULL DEFAULT 'Staging'" },
+      { name: "status", definition: "BOOLEAN NOT NULL DEFAULT 1" },
+      { name: "callback_url", definition: "VARCHAR(500) DEFAULT '{subdomain}/api/fawry_callback'" },
+      { name: "created_at", definition: "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP" },
+      { name: "updated_at", definition: "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" },
+    ],
+    createSql: (db) => `
+      CREATE TABLE IF NOT EXISTS \`${db}\`.\`fawry\` (
+        \`id\` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+        \`name\` JSON NOT NULL,
+        \`logo\` VARCHAR(500) NOT NULL,
+        \`merchant_code\` TEXT NULL,
+        \`merchant_secret_key\` TEXT NOT NULL,
+        \`fawry_base_url\` ENUM('Staging', 'Live') NOT NULL DEFAULT 'Staging',
+        \`status\` BOOLEAN NOT NULL DEFAULT 1,
+        \`callback_url\` VARCHAR(500) DEFAULT '{subdomain}/api/fawry_callback',
+        \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+  },
 ];
 
 /**
