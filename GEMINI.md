@@ -11,7 +11,7 @@ Always follow these rules automatically across all conversations in this project
   - Tenant Multi-Tenancy project where each tenant has their own wildcard schema.
   - Subdomain resolution: extract `subdomain` from host (e.g. `ahmed.wego.com` -> `ahmed`), verify against central `users.subdomain`, throw error if not found, execute against `subdomain` wildcard schema if found.
   - Tenant schema tables live in `E:\SubAdminECommerce\src\models\tenant/` with each table in a separate file:
-    `customers.ts` (includes `image` nullable), `categories.ts`, `brands.ts`, `discounts.ts`, `flashDiscounts.ts`, `popups.ts`, `warranties.ts`, `taxes.ts`, `roles.ts`, `permissions.ts`, `staff.ts`, `paymentMethods.ts`, `products.ts`, `attributes.ts`, `values.ts`, `productAttributes.ts`, `productValues.ts`, `cities.ts`, `zones.ts`, `addresses.ts`, `languages.ts`.
+    `customers.ts` (includes `image` nullable), `categories.ts`, `brands.ts`, `discounts.ts`, `flashDiscounts.ts`, `popups.ts`, `warranties.ts`, `taxes.ts`, `roles.ts`, `permissions.ts`, `staff.ts`, `paymentMethods.ts`, `products.ts`, `attributes.ts`, `values.ts`, `productAttributes.ts`, `productValues.ts`, `cities.ts`, `zones.ts`, `addresses.ts`, `languages.ts`, `admins.ts`.
 - Primary keys use `char("id", { length: 36 }).primaryKey().default(sql\`(UUID())\`)`.
 
 ## 2. CRUD & Folder Conventions (`controllers`, `validators`, `routes`)
@@ -53,7 +53,7 @@ Always follow these rules automatically across all conversations in this project
 ## 4. Multi-Tenant Schema Synchronization & Migration Rules
 - **Canonical Table Definitions (`TENANT_TABLE_DEFINITIONS`)**:
   - Located in `src/services/tenantSchemaService.ts` in both projects.
-  - Acts as the single source of truth for all 21 tenant tables.
+  - Acts as the single source of truth for all 22 tenant tables.
   - Whenever any model, table, or column in `E:\SubAdminECommerce\src\models\tenant/` is added, modified, or removed:
     1. ALWAYS update `TENANT_TABLE_DEFINITIONS` in `src/services/tenantSchemaService.ts` in both projects.
     2. This guarantees that **new tenant schemas** created via `createTenantSchema(subdomain)` immediately receive the latest structure.

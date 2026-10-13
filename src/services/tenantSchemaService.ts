@@ -82,7 +82,37 @@ export const TENANT_TABLE_DEFINITIONS: TableDef[] = [
     `,
   },
 
-  // 4. Staff (staff)
+  // 4. Admins (admin)
+  {
+    name: "admin",
+    columns: [
+      { name: "id", definition: "CHAR(36) PRIMARY KEY DEFAULT (UUID())" },
+      { name: "name", definition: "VARCHAR(255) NOT NULL" },
+      { name: "email", definition: "VARCHAR(255) NOT NULL UNIQUE" },
+      { name: "phone", definition: "VARCHAR(50) NOT NULL UNIQUE" },
+      { name: "password", definition: "VARCHAR(255) NOT NULL" },
+      { name: "role_id", definition: "CHAR(36) NOT NULL" },
+      { name: "status", definition: "BOOLEAN NOT NULL DEFAULT 1" },
+      { name: "created_at", definition: "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP" },
+      { name: "updated_at", definition: "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" },
+    ],
+    createSql: (db) => `
+      CREATE TABLE IF NOT EXISTS \`${db}\`.\`admin\` (
+        \`id\` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+        \`name\` VARCHAR(255) NOT NULL,
+        \`email\` VARCHAR(255) NOT NULL UNIQUE,
+        \`phone\` VARCHAR(50) NOT NULL UNIQUE,
+        \`password\` VARCHAR(255) NOT NULL,
+        \`role_id\` CHAR(36) NOT NULL,
+        \`status\` BOOLEAN NOT NULL DEFAULT 1,
+        \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT \`fk_admin_role_${db}\` FOREIGN KEY (\`role_id\`) REFERENCES \`${db}\`.\`role\` (\`id\`) ON DELETE RESTRICT
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `,
+  },
+
+  // 5. Staff (staff)
   {
     name: "staff",
     columns: [
