@@ -33,11 +33,22 @@ Always follow these rules automatically across all conversations in this project
       returns `{ categories: [{ id, name }], brands: [{ id, name }], discounts: [{ id, name }], flash_discounts: [{ id, name }], taxes: [{ id, name }], warranties: [{ id, name }] }`.
 - **Address Google Maps Link**: Compute `map_url = "https://www.google.com/maps/search/?api=1&query=${lat},${lng}"` for addresses.
 
-## 3. Image Service & Handling Rules (MANDATORY across all modules)
-All image operations MUST use the centralized image service functions from `src/services/imageService.ts` (or `src/utils/handleImages.ts`) where the storage folder is `uploads`:
-1. **On Create / Add**: `uploadImage(req, base64, "uploads")`
-2. **On Update / Edit**: `updateImage(req, newBase64, "uploads", oldImageUrlOrPath)`
-3. **On Delete / Remove**: `deleteImage(oldImageUrlOrPath)` BEFORE deleting the database record.
+## 3. Image Handling Rules (NO Base64 - Use Multipart/Form-Data or Direct URLs)
+- **STRICT PROHIBITION**: Base64 image uploading is strictly forbidden across all modules due to performance and payload overhead.
+- **Upload Mechanism**: All images are uploaded via `multipart/form-data` using Multer (`src/middlewares/upload.ts`) or supplied as pre-uploaded URL strings.
+- **Multer Middlewares**:
+  - `uploadSingleImage("fieldName")` for single image fields (e.g. `logo`, `image`, `icon`).
+  - `uploadMultipleImages("fieldName", maxCount)` for array fields (e.g. `gallery`, `image`).
+  - `uploadFieldsImages([...])` for multiple named file fields.
+  - Form text fields (including multilingual JSON objects) in `multipart/form-data` are automatically parsed by `parseFormDataJson`.
+- **Dedicated Upload Endpoints**:
+  - `POST /upload`: upload single image -> returns `{ url, filename }`.
+  - `POST /upload/multiple`: upload multiple images -> returns `{ urls, count }`.
+- **Storage & Static Serving**: Saved into `uploads/` with UUID filenames, served statically via `/uploads`.
+- **CRUD Operations**:
+  1. **On Create / Add**: Image processed via Multer form-data middleware or accepted as URL; stored in DB as full URL.
+  2. **On Update / Edit**: `updateImage(req, newFileOrUrl, "uploads", oldImageUrl)` deletes old physical image if changed.
+  3. **On Delete / Remove**: `deleteImage(oldImageUrl)` physically deletes file from `uploads/` BEFORE deleting the database record.
 
 ## 4. Multi-Tenant Schema Synchronization & Migration Rules
 - **Canonical Table Definitions (`TENANT_TABLE_DEFINITIONS`)**:

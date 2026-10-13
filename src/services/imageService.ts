@@ -2,5 +2,12 @@ export {
   uploadImage,
   updateImage,
   deleteImage,
-  saveBase64Image,
 } from "../utils/handleImages";
+
+export {
+  upload,
+  uploadSingleImage,
+  uploadMultipleImages,
+  uploadFieldsImages,
+  getFileUrl,
+} from "../middlewares/upload";

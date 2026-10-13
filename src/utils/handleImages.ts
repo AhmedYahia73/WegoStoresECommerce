@@ -1,48 +1,40 @@
 import path from "path";
 import fs from "fs/promises";
 import { Request } from "express";
-import { v4 as uuidv4 } from "uuid";
-import { BadRequest } from "../Errors/BadRequest";
 
 /**
- * 1. Upload/Save a new Base64 image into `uploads` and return its URL to store in DB.
+ * 1. Process and resolve image URL to store in DB.
+ * Accepts Multer file, HTTP(S) URL, or relative path.
  */
 export async function uploadImage(
   req: Request,
-  base64: string,
-  folder: string = "uploads"
+  fileOrUrl?: string | Express.Multer.File | null,
+  _folder: string = "uploads"
 ): Promise<string> {
-  const matches = base64.match(/^data:(.+);base64,(.+)$/);
-  if (!matches || matches.length !== 3) {
-    throw new BadRequest("Invalid base64 image format");
+  if (!fileOrUrl) return "";
+
+  if (typeof fileOrUrl === "object" && "filename" in fileOrUrl) {
+    return `${req.protocol}://${req.get("host")}/uploads/${fileOrUrl.filename}`;
   }
 
-  const mimeType = matches[1];
-  const ext = mimeType.split("/")[1] || "png";
-  const buffer = Buffer.from(matches[2], "base64");
+  if (typeof fileOrUrl === "string") {
+    if (fileOrUrl.startsWith("http://") || fileOrUrl.startsWith("https://")) {
+      return fileOrUrl;
+    }
 
-  const fileName = `${uuidv4()}.${ext}`;
-  const uploadsDir =
-    folder === "uploads"
-      ? path.join(__dirname, "../..", "uploads")
-      : path.join(__dirname, "../..", "uploads", folder);
+    const clean = fileOrUrl.startsWith("/") ? fileOrUrl.slice(1) : fileOrUrl;
+    if (clean.startsWith("uploads/")) {
+      return `${req.protocol}://${req.get("host")}/${clean}`;
+    }
 
-  await fs.mkdir(uploadsDir, { recursive: true });
+    return `${req.protocol}://${req.get("host")}/uploads/${clean}`;
+  }
 
-  const filePath = path.join(uploadsDir, fileName);
-  await fs.writeFile(filePath, buffer);
-
-  const relativePath =
-    folder === "uploads"
-      ? `uploads/${fileName}`
-      : `uploads/${folder}/${fileName}`;
-  const imageUrl = `${req.protocol}://${req.get("host")}/${relativePath}`;
-
-  return imageUrl;
+  return "";
 }
 
 /**
- * 2. Delete an existing image from `uploads` folder (accepts full URL or relative path).
+ * 2. Delete an existing image physically from `uploads` folder.
  */
 export async function deleteImage(
   imageUrlOrPath?: string | null
@@ -52,7 +44,7 @@ export async function deleteImage(
   try {
     let relativePath = imageUrlOrPath;
 
-    if (imageUrlOrPath.startsWith("http")) {
+    if (imageUrlOrPath.startsWith("http://") || imageUrlOrPath.startsWith("https://")) {
       const url = new URL(imageUrlOrPath);
       relativePath = url.pathname.startsWith("/")
         ? url.pathname.slice(1)
@@ -66,37 +58,22 @@ export async function deleteImage(
 
     return true;
   } catch (err) {
-    console.error("Error deleting photo:", err);
     return false;
   }
 }
 
 /**
- * 3. Update an image: deletes the old image first (if it exists), saves the new image in `uploads`,
- * and returns the new URL to store in DB.
+ * 3. Update an image: deletes old image (if changed) and returns new URL.
  */
 export async function updateImage(
   req: Request,
-  newBase64: string,
+  newFileOrUrl?: string | Express.Multer.File | null,
   folder: string = "uploads",
   oldImageUrlOrPath?: string | null
 ): Promise<string> {
-  if (oldImageUrlOrPath) {
+  const newUrl = await uploadImage(req, newFileOrUrl, folder);
+  if (oldImageUrlOrPath && newUrl && oldImageUrlOrPath !== newUrl) {
     await deleteImage(oldImageUrlOrPath);
   }
-  return await uploadImage(req, newBase64, folder);
-}
-
-// Backward-compatible helper
-export async function saveBase64Image(
-  req: Request,
-  base64: string,
-  folder: string = "uploads"
-): Promise<{ url: string; relativePath: string }> {
-  const url = await uploadImage(req, base64, folder);
-  const parsed = new URL(url);
-  const relativePath = parsed.pathname.startsWith("/")
-    ? parsed.pathname.slice(1)
-    : parsed.pathname;
-  return { url, relativePath };
+  return newUrl;
 }

@@ -109,7 +109,7 @@ function zodNodeToOpenApi(
         result.format = "password";
         result.example = "secret123";
       } else if (lower.includes("icon") || lower.includes("image") || lower.includes("photo") || lower.includes("logo")) {
-        result.example = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+        result.example = "https://example.com/uploads/sample.png";
       } else if (lower.includes("phone")) {
         result.example = "+201012345678";
       } else if (lower.includes("subdomain")) {

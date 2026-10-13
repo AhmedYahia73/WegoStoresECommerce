@@ -16,6 +16,8 @@ import {
   paymentMethodIdParamSchema,
 } from "../../validators/super_admin/paymentMethods";
 
+import { uploadSingleImage } from "../../middlewares/upload";
+
 const router = Router();
 
 router.get("/", checkOnlyAdmin(), catchAsync(getAllPaymentMethods));
@@ -32,6 +34,7 @@ router.get(
 router.post(
   "/",
   checkOnlyAdmin(),
+  uploadSingleImage("icon"),
   validate(createPaymentMethodSchema),
   catchAsync(createPaymentMethod)
 );
@@ -39,6 +42,7 @@ router.post(
 router.put(
   "/:id",
   checkOnlyAdmin(),
+  uploadSingleImage("icon"),
   validate(updatePaymentMethodSchema),
   catchAsync(updatePaymentMethod)
 );
