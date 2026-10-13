@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   getAllUsers,
+  getUsersLists,
   getUsersSelection,
   getUserById,
   createUser,
@@ -19,7 +20,7 @@ import {
 const router = Router();
 
 router.get("/", checkOnlyAdmin(), catchAsync(getAllUsers));
-
+router.get("/lists", checkOnlyAdmin(), catchAsync(getUsersLists));
 router.get("/select", checkOnlyAdmin(), catchAsync(getUsersSelection));
 
 router.get(

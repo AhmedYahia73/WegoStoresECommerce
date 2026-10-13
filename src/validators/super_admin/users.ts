@@ -17,6 +17,7 @@ export const createUserSchema = z.object({
     password: z
       .string({ required_error: "Password is required" })
       .min(6, "Password must be at least 6 characters long"),
+    package_id: z.string().uuid("Invalid package ID").optional().nullable(),
   }),
 });
 
@@ -35,6 +36,7 @@ export const updateUserSchema = z.object({
       .string()
       .min(6, "Password must be at least 6 characters long")
       .optional(),
+    package_id: z.string().uuid("Invalid package ID").optional().nullable(),
   }),
 });
 

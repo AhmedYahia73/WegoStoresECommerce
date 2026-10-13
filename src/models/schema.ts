@@ -4,3 +4,5 @@ export * from "./central/packages";
 export * from "./central/paymentMethods";
 export * from "./central/admins";
 export * from "./central/orders";
+export * from "./central/discounts";
+export * from "./central/userOrders";
