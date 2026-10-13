@@ -1,17 +1,35 @@
 import { Request, Response } from "express";
 import { db } from "../../models/db";
 import { paymentMethods } from "../../models/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { NotFound } from "../../Errors";
 import { SuccessResponse } from "../../utils/response";
 import { uploadImage, updateImage, deleteImage } from "../../utils/handleImages";
+import { getPaginationParams, buildPaginationMeta } from "../../utils/pagination";
 
 const IMAGE_FOLDER = "payment_methods";
 
-// 1. Get All Payment Methods
+// 1. Get All Payment Methods (Paginated)
 export async function getAllPaymentMethods(req: Request, res: Response) {
-  const allPaymentMethods = await db.select().from(paymentMethods);
-  return SuccessResponse(res, { paymentMethods: allPaymentMethods }, 200);
+  const { page, limit, offset } = getPaginationParams(req);
+
+  const [countResult] = await db.select({ total: sql<number>`count(*)` }).from(paymentMethods);
+  const total = Number(countResult?.total || 0);
+
+  const allPaymentMethods = await db
+    .select()
+    .from(paymentMethods)
+    .limit(limit)
+    .offset(offset);
+
+  return SuccessResponse(
+    res,
+    {
+      paymentMethods: allPaymentMethods,
+      pagination: buildPaginationMeta(total, page, limit),
+    },
+    200
+  );
 }
 
 // 2. Get Payment Methods Selection (id, name)

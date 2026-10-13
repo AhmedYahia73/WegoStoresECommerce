@@ -1,18 +1,24 @@
 import { Request, Response } from "express";
 import { db } from "../../models/db";
 import { users } from "../../models/schema";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and, ne, sql } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import { ConflictError, NotFound } from "../../Errors";
 import { SuccessResponse } from "../../utils/response";
+import { getPaginationParams, buildPaginationMeta } from "../../utils/pagination";
 import {
   createTenantSchema,
   renameTenantSchema,
   deleteTenantSchema,
 } from "../../services/tenantSchemaService";
 
-// 1. Get All Users
+// 1. Get All Users (Paginated)
 export async function getAllUsers(req: Request, res: Response) {
+  const { page, limit, offset } = getPaginationParams(req);
+
+  const [countResult] = await db.select({ total: sql<number>`count(*)` }).from(users);
+  const total = Number(countResult?.total || 0);
+
   const allUsers = await db
     .select({
       id: users.id,
@@ -23,9 +29,18 @@ export async function getAllUsers(req: Request, res: Response) {
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
     })
-    .from(users);
+    .from(users)
+    .limit(limit)
+    .offset(offset);
 
-  return SuccessResponse(res, { users: allUsers }, 200);
+  return SuccessResponse(
+    res,
+    {
+      users: allUsers,
+      pagination: buildPaginationMeta(total, page, limit),
+    },
+    200
+  );
 }
 
 // 2. Get Users Selection (id, name) for relational dropdowns (e.g. orders.user_id)

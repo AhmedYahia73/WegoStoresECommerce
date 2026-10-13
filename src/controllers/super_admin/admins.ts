@@ -1,13 +1,19 @@
 import { Request, Response } from "express";
 import { db } from "../../models/db";
 import { admins } from "../../models/schema";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and, ne, sql } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import { ConflictError, NotFound } from "../../Errors";
 import { SuccessResponse } from "../../utils/response";
+import { getPaginationParams, buildPaginationMeta } from "../../utils/pagination";
 
-// 1. Get All Admins
+// 1. Get All Admins (Paginated)
 export async function getAllAdmin(req: Request, res: Response) {
+  const { page, limit, offset } = getPaginationParams(req);
+
+  const [countResult] = await db.select({ total: sql<number>`count(*)` }).from(admins);
+  const total = Number(countResult?.total || 0);
+
   const allAdmins = await db
     .select({
       id: admins.id,
@@ -16,9 +22,18 @@ export async function getAllAdmin(req: Request, res: Response) {
       createdAt: admins.createdAt,
       updatedAt: admins.updatedAt,
     })
-    .from(admins);
+    .from(admins)
+    .limit(limit)
+    .offset(offset);
 
-  return SuccessResponse(res, { admins: allAdmins }, 200);
+  return SuccessResponse(
+    res,
+    {
+      admins: allAdmins,
+      pagination: buildPaginationMeta(total, page, limit),
+    },
+    200
+  );
 }
 
 // 2. Get Admin By ID
