@@ -5,12 +5,12 @@ import { v4 as uuidv4 } from "uuid";
 import { BadRequest } from "../Errors/BadRequest";
 
 /**
- * 1. Upload/Save a new Base64 image into `uploads/{folder}` and return its URL to store in DB.
+ * 1. Upload/Save a new Base64 image into `uploads` and return its URL to store in DB.
  */
 export async function uploadImage(
   req: Request,
   base64: string,
-  folder: string
+  folder: string = "uploads"
 ): Promise<string> {
   const matches = base64.match(/^data:(.+);base64,(.+)$/);
   if (!matches || matches.length !== 3) {
@@ -22,14 +22,20 @@ export async function uploadImage(
   const buffer = Buffer.from(matches[2], "base64");
 
   const fileName = `${uuidv4()}.${ext}`;
-  const uploadsDir = path.join(__dirname, "../..", "uploads", folder);
+  const uploadsDir =
+    folder === "uploads"
+      ? path.join(__dirname, "../..", "uploads")
+      : path.join(__dirname, "../..", "uploads", folder);
 
   await fs.mkdir(uploadsDir, { recursive: true });
 
   const filePath = path.join(uploadsDir, fileName);
   await fs.writeFile(filePath, buffer);
 
-  const relativePath = `uploads/${folder}/${fileName}`;
+  const relativePath =
+    folder === "uploads"
+      ? `uploads/${fileName}`
+      : `uploads/${folder}/${fileName}`;
   const imageUrl = `${req.protocol}://${req.get("host")}/${relativePath}`;
 
   return imageUrl;
@@ -66,13 +72,13 @@ export async function deleteImage(
 }
 
 /**
- * 3. Update an image: deletes the old image first (if it exists), saves the new image in `uploads/{folder}`,
+ * 3. Update an image: deletes the old image first (if it exists), saves the new image in `uploads`,
  * and returns the new URL to store in DB.
  */
 export async function updateImage(
   req: Request,
   newBase64: string,
-  folder: string,
+  folder: string = "uploads",
   oldImageUrlOrPath?: string | null
 ): Promise<string> {
   if (oldImageUrlOrPath) {
@@ -85,7 +91,7 @@ export async function updateImage(
 export async function saveBase64Image(
   req: Request,
   base64: string,
-  folder: string
+  folder: string = "uploads"
 ): Promise<{ url: string; relativePath: string }> {
   const url = await uploadImage(req, base64, folder);
   const parsed = new URL(url);

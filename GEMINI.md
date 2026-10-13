@@ -9,24 +9,47 @@ Always follow these rules automatically across all conversations in this project
   - Re-exported in `src/models/schema.ts`.
 - **Sub-Admin Project (`E:\SubAdminECommerce`)**:
   - Tenant Multi-Tenancy project where each tenant has their own wildcard schema.
+  - Subdomain resolution: extract `subdomain` from host (e.g. `ahmed.wego.com` -> `ahmed`), verify against central `users.subdomain`, throw error if not found, execute against `subdomain` wildcard schema if found.
   - Tenant schema tables live in `E:\SubAdminECommerce\src\models\tenant/` with each table in a separate file:
-    `customers.ts`, `categories.ts`, `brands.ts`, `discounts.ts`, `flashDiscounts.ts`, `popups.ts`, `warranties.ts`, `taxes.ts`, `roles.ts`, `permissions.ts`, `staff.ts`, `paymentMethods.ts`, `products.ts`, `attributes.ts`, `values.ts`, `productAttributes.ts`, `productValues.ts`, `cities.ts`, `zones.ts`, `addresses.ts`, `languages.ts`.
+    `customers.ts` (includes `image` nullable), `categories.ts`, `brands.ts`, `discounts.ts`, `flashDiscounts.ts`, `popups.ts`, `warranties.ts`, `taxes.ts`, `roles.ts`, `permissions.ts`, `staff.ts`, `paymentMethods.ts`, `products.ts`, `attributes.ts`, `values.ts`, `productAttributes.ts`, `productValues.ts`, `cities.ts`, `zones.ts`, `addresses.ts`, `languages.ts`.
 - Primary keys use `char("id", { length: 36 }).primaryKey().default(sql\`(UUID())\`)`.
 
 ## 2. CRUD & Folder Conventions (`controllers`, `validators`, `routes`)
 - **Validators**: Place all Zod validation schemas in `src/validators/{role}/{element}.ts`.
 - **Controllers**: Place CRUD controllers in `src/controllers/{role}/{element}.ts`.
 - **Routes**: Place route definitions in `src/routes/{role}/{item}.ts` and mount them in `src/routes/{role}/index.ts`.
-- **Route Middleware Pattern**: Always attach permission middleware, validation middleware, and `catchAsync` directly on the route, e.g.:
-  ```ts
-  router.get("/", checkOnlyAdmin(), catchAsync(getAllItems));
-  router.post("/", checkOnlyAdmin(), validate(createItemSchema), catchAsync(createItem));
-  ```
-- **Automatic Swagger from Zod**: `src/config/swagger.ts` automatically scans all Express routes and reads the Zod schema attached by `validate(schema)` to generate OpenAPI parameters (`params`, `query`) and `requestBody` (`body`) keys. Do not clutter route files with manual `@swagger` JSDoc blocks.
-- **Relational Selection Endpoints**: Whenever a table has columns referencing another table (Foreign Key relation), create a selection API endpoint that fetches `{ id, name }` for the tables needed for dropdown/selection.
+- **Route Middleware Pattern**: Always attach permission middleware, validation middleware, and `catchAsync` directly on the route.
+- **Multilingual Fields (`name`, `description`)**:
+  - Support active languages from `lang` table where `status = true`.
+  - In add/edit: first language is required, others optional.
+  - In fetch: client specifies `?lang=...`, fallback to first language if missing.
+  - If `description` is nullable, key is optional.
+- **Relational Lists Endpoint (`GET /{item}/lists`) (MANDATORY across all modules with relations)**:
+  - Whenever a table has columns referencing other tables (Foreign Key relations needed at create/edit):
+    - Create a dedicated `GET /lists` endpoint on that element router (e.g. `GET /products/lists`, `GET /addresses/lists`, `GET /staff/lists`, `GET /zones/lists`).
+    - It must fetch and return all the tables related to this element at once as `{ [relatedTableName]: [{ id, name }] }`.
+    - Every related item MUST have `{ id, name }`, where `name` is localized according to `?lang=...` (falling back to the first available language if missing).
+    - Example for products (`GET /products/lists`):
+      returns `{ categories: [{ id, name }], brands: [{ id, name }], discounts: [{ id, name }], flash_discounts: [{ id, name }], taxes: [{ id, name }], warranties: [{ id, name }] }`.
+- **Address Google Maps Link**: Compute `map_url = "https://www.google.com/maps/search/?api=1&query=${lat},${lng}"` for addresses.
 
-## 3. Image Upload / Update / Delete Service (`src/utils/handleImages.ts`)
-Always use the standard functions in `src/utils/handleImages.ts` whenever any model has an image/icon field:
-- **On Create**: Use `uploadImage(req, base64, folder)` — saves the image in `uploads/{folder}` and returns its URL string to store in the database.
-- **On Update**: Use `updateImage(req, newBase64, folder, oldImageUrlOrPath)` — deletes the old image from `uploads` first (if it exists), saves the new image in `uploads/{folder}`, and returns the new URL string to store in the database.
-- **On Delete**: Use `deleteImage(oldImageUrlOrPath)` — deletes the old image file from `uploads` before/when deleting the database record.
+## 3. Image Service & Handling Rules (MANDATORY across all modules)
+All image operations MUST use the centralized image service functions from `src/services/imageService.ts` (or `src/utils/handleImages.ts`) where the storage folder is `uploads`:
+1. **On Create / Add**: `uploadImage(req, base64, "uploads")`
+2. **On Update / Edit**: `updateImage(req, newBase64, "uploads", oldImageUrlOrPath)`
+3. **On Delete / Remove**: `deleteImage(oldImageUrlOrPath)` BEFORE deleting the database record.
+
+## 4. Multi-Tenant Schema Synchronization & Migration Rules
+- **Canonical Table Definitions (`TENANT_TABLE_DEFINITIONS`)**:
+  - Located in `src/services/tenantSchemaService.ts` in both projects.
+  - Acts as the single source of truth for all 21 tenant tables.
+  - Whenever any model, table, or column in `E:\SubAdminECommerce\src\models\tenant/` is added, modified, or removed:
+    1. ALWAYS update `TENANT_TABLE_DEFINITIONS` in `src/services/tenantSchemaService.ts` in both projects.
+    2. This guarantees that **new tenant schemas** created via `createTenantSchema(subdomain)` immediately receive the latest structure.
+- **Migrating Existing Tenants (`npm run db:migrate:tenants`)**:
+  - Whenever tenant models are updated, execute `npm run db:migrate:tenants`.
+  - It inspects `INFORMATION_SCHEMA` across all registered tenants from central `users`:
+    - Automatically creates any missing tables.
+    - Automatically adds any missing columns via `ALTER TABLE ... ADD COLUMN ...`.
+    - Preserves live user data without drop or data loss.
+    - Seeds default initial data (languages `ar`, `en` and role `admin`) if missing.

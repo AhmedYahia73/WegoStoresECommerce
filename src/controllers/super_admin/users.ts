@@ -5,6 +5,11 @@ import { eq, and, ne } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import { ConflictError, NotFound } from "../../Errors";
 import { SuccessResponse } from "../../utils/response";
+import {
+  createTenantSchema,
+  renameTenantSchema,
+  deleteTenantSchema,
+} from "../../services/tenantSchemaService";
 
 // 1. Get All Users
 export async function getAllUsers(req: Request, res: Response) {
@@ -93,6 +98,7 @@ export async function createUser(req: Request, res: Response) {
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
+  // 1. Insert user into central users table
   await db.insert(users).values({
     name,
     email,
@@ -101,7 +107,16 @@ export async function createUser(req: Request, res: Response) {
     password: hashedPassword,
   });
 
-  return SuccessResponse(res, { message: "User created successfully" }, 201);
+  // 2. Automatically create tenant wildcard MySQL schema with all 21 tables & initial data
+  try {
+    await createTenantSchema(subdomain);
+  } catch (schemaError) {
+    // If schema creation fails, rollback user record from central DB
+    await db.delete(users).where(eq(users.subdomain, subdomain));
+    throw schemaError;
+  }
+
+  return SuccessResponse(res, { message: "User and tenant schema created successfully" }, 201);
 }
 
 // 5. Update User
@@ -131,7 +146,10 @@ export async function updateUser(req: Request, res: Response) {
     }
   }
 
-  if (subdomain && subdomain !== existingUser[0].subdomain) {
+  const oldSubdomain = existingUser[0].subdomain;
+  const isSubdomainChanged = subdomain && subdomain !== oldSubdomain;
+
+  if (isSubdomainChanged) {
     const subdomainTaken = await db
       .select({ id: users.id })
       .from(users)
@@ -164,6 +182,11 @@ export async function updateUser(req: Request, res: Response) {
     updateData.password = await bcrypt.hash(password, 10);
   }
 
+  // If subdomain changed, rename the MySQL database / schema
+  if (isSubdomainChanged) {
+    await renameTenantSchema(oldSubdomain, subdomain);
+  }
+
   if (Object.keys(updateData).length > 0) {
     await db.update(users).set(updateData).where(eq(users.id, id));
   }
@@ -176,7 +199,7 @@ export async function deleteUser(req: Request, res: Response) {
   const { id } = req.params;
 
   const existingUser = await db
-    .select({ id: users.id })
+    .select({ id: users.id, subdomain: users.subdomain })
     .from(users)
     .where(eq(users.id, id))
     .limit(1);
@@ -185,7 +208,11 @@ export async function deleteUser(req: Request, res: Response) {
     throw new NotFound("User not found");
   }
 
+  // 1. Drop tenant wildcard database/schema
+  await deleteTenantSchema(existingUser[0].subdomain);
+
+  // 2. Delete user from central database
   await db.delete(users).where(eq(users.id, id));
 
-  return SuccessResponse(res, { message: "User deleted successfully" }, 200);
+  return SuccessResponse(res, { message: "User and tenant schema deleted successfully" }, 200);
 }
