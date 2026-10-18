@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getFileUrl = exports.uploadFieldsImages = exports.uploadMultipleImages = exports.uploadSingleImage = exports.upload = exports.deleteImage = exports.updateImage = exports.uploadImage = void 0;
+var handleImages_1 = require("../utils/handleImages");
+Object.defineProperty(exports, "uploadImage", { enumerable: true, get: function () { return handleImages_1.uploadImage; } });
+Object.defineProperty(exports, "updateImage", { enumerable: true, get: function () { return handleImages_1.updateImage; } });
+Object.defineProperty(exports, "deleteImage", { enumerable: true, get: function () { return handleImages_1.deleteImage; } });
+var upload_1 = require("../middlewares/upload");
+Object.defineProperty(exports, "upload", { enumerable: true, get: function () { return upload_1.upload; } });
+Object.defineProperty(exports, "uploadSingleImage", { enumerable: true, get: function () { return upload_1.uploadSingleImage; } });
+Object.defineProperty(exports, "uploadMultipleImages", { enumerable: true, get: function () { return upload_1.uploadMultipleImages; } });
+Object.defineProperty(exports, "uploadFieldsImages", { enumerable: true, get: function () { return upload_1.uploadFieldsImages; } });
+Object.defineProperty(exports, "getFileUrl", { enumerable: true, get: function () { return upload_1.getFileUrl; } });

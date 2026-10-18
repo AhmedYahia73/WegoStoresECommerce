@@ -19,3 +19,5 @@ __exportStar(require("./packages"), exports);
 __exportStar(require("./paymentMethods"), exports);
 __exportStar(require("./admins"), exports);
 __exportStar(require("./orders"), exports);
+__exportStar(require("./discounts"), exports);
+__exportStar(require("./userOrders"), exports);

@@ -12,11 +12,22 @@ const drizzle_orm_1 = require("drizzle-orm");
 const Errors_1 = require("../../Errors");
 const response_1 = require("../../utils/response");
 const handleImages_1 = require("../../utils/handleImages");
+const pagination_1 = require("../../utils/pagination");
 const IMAGE_FOLDER = "payment_methods";
-// 1. Get All Payment Methods
+// 1. Get All Payment Methods (Paginated)
 async function getAllPaymentMethods(req, res) {
-    const allPaymentMethods = await db_1.db.select().from(schema_1.paymentMethods);
-    return (0, response_1.SuccessResponse)(res, { paymentMethods: allPaymentMethods }, 200);
+    const { page, limit, offset } = (0, pagination_1.getPaginationParams)(req);
+    const [countResult] = await db_1.db.select({ total: (0, drizzle_orm_1.sql) `count(*)` }).from(schema_1.paymentMethods);
+    const total = Number(countResult?.total || 0);
+    const allPaymentMethods = await db_1.db
+        .select()
+        .from(schema_1.paymentMethods)
+        .limit(limit)
+        .offset(offset);
+    return (0, response_1.SuccessResponse)(res, {
+        paymentMethods: allPaymentMethods,
+        pagination: (0, pagination_1.buildPaginationMeta)(total, page, limit),
+    }, 200);
 }
 // 2. Get Payment Methods Selection (id, name)
 async function getPaymentMethodsSelection(req, res) {

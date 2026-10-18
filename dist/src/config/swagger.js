@@ -7,21 +7,24 @@ exports.setupSwagger = void 0;
 const express_1 = __importDefault(require("express"));
 const swagger_jsdoc_1 = __importDefault(require("swagger-jsdoc"));
 const swagger_ui_express_1 = __importDefault(require("swagger-ui-express"));
-// 1. Patch Express Router.use so sub-router mount paths are captured in Express 4 & 5
-const routerProto = Object.getPrototypeOf(express_1.default.Router());
-if (routerProto && !routerProto.__swaggerPatched) {
-    const originalUse = routerProto.use;
-    routerProto.use = function (...args) {
-        const stackLenBefore = this.stack ? this.stack.length : 0;
-        const result = originalUse.apply(this, args);
-        if (typeof args[0] === "string" && this.stack) {
-            for (let i = stackLenBefore; i < this.stack.length; i++) {
-                this.stack[i].__mountPath = args[0];
+// 1. Patch Express Router.use across Express 4 & Express 5 prototype hierarchy
+let routerProto = express_1.default.Router();
+while (routerProto && routerProto !== Object.prototype) {
+    if (Object.prototype.hasOwnProperty.call(routerProto, "use") && !routerProto.__swaggerPatched) {
+        const originalUse = routerProto.use;
+        routerProto.use = function (...args) {
+            const stackLenBefore = this.stack ? this.stack.length : 0;
+            const result = originalUse.apply(this, args);
+            if (typeof args[0] === "string" && this.stack) {
+                for (let i = stackLenBefore; i < this.stack.length; i++) {
+                    this.stack[i].__mountPath = args[0];
+                }
             }
-        }
-        return result;
-    };
-    routerProto.__swaggerPatched = true;
+            return result;
+        };
+        routerProto.__swaggerPatched = true;
+    }
+    routerProto = Object.getPrototypeOf(routerProto);
 }
 // 2. Convert a Zod schema node into an OpenAPI 3.0 schema object
 function zodNodeToOpenApi(zodSchema, fieldName) {
@@ -30,6 +33,7 @@ function zodNodeToOpenApi(zodSchema, fieldName) {
     }
     const def = zodSchema._def;
     const typeName = def.typeName;
+    // Recursively unwrap all ZodEffects (refine, transform, etc.)
     if (typeName === "ZodEffects") {
         return zodNodeToOpenApi(def.schema, fieldName);
     }
@@ -78,7 +82,7 @@ function zodNodeToOpenApi(zodSchema, fieldName) {
         for (const check of checks) {
             if (check.kind === "email") {
                 result.format = "email";
-                result.example = "user@example.com";
+                result.example = "admin@example.com";
             }
             else if (check.kind === "uuid") {
                 result.format = "uuid";
@@ -103,20 +107,24 @@ function zodNodeToOpenApi(zodSchema, fieldName) {
                 result.format = "password";
                 result.example = "secret123";
             }
-            else if (lower.includes("icon") || lower.includes("image") || lower.includes("photo") || lower.includes("logo")) {
-                result.example = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+            else if (lower.includes("icon") ||
+                lower.includes("image") ||
+                lower.includes("photo") ||
+                lower.includes("logo") ||
+                lower.includes("banner")) {
+                result.example = "https://wegostores.com/uploads/sample.png";
             }
             else if (lower.includes("phone")) {
                 result.example = "+201012345678";
             }
             else if (lower.includes("subdomain")) {
-                result.example = "my-store";
+                result.example = "store1";
             }
             else if (lower === "name" || lower.endsWith("_name")) {
                 result.example = "Sample Name";
             }
             else if (lower.includes("description")) {
-                result.example = "Sample description";
+                result.example = "Sample description text";
             }
         }
         return { schema: result, isOptional: false };
@@ -133,8 +141,11 @@ function zodNodeToOpenApi(zodSchema, fieldName) {
         }
         if (fieldName) {
             const lower = fieldName.toLowerCase();
-            if (lower.includes("price") || lower.includes("total")) {
-                result.example = 100.0;
+            if (lower.includes("price") || lower.includes("total") || lower.includes("cost")) {
+                result.example = 150.0;
+            }
+            else if (lower.includes("order") || lower.includes("count") || lower.includes("qty")) {
+                result.example = 1;
             }
             else {
                 result.example = 10;
@@ -190,10 +201,25 @@ function zodNodeToOpenApi(zodSchema, fieldName) {
         };
     }
     if (typeName === "ZodRecord") {
+        const valueSchema = def.valueType
+            ? zodNodeToOpenApi(def.valueType, fieldName).schema
+            : { type: "string" };
+        const isMultilingual = !fieldName ||
+            fieldName.toLowerCase().includes("name") ||
+            fieldName.toLowerCase().includes("desc") ||
+            fieldName.toLowerCase().includes("title");
         return {
             schema: {
                 type: "object",
-                additionalProperties: zodNodeToOpenApi(def.valueType, fieldName).schema,
+                additionalProperties: valueSchema,
+                ...(isMultilingual
+                    ? {
+                        example: {
+                            ar: "مثال بالعربية",
+                            en: "Example in English",
+                        },
+                    }
+                    : {}),
             },
             isOptional: false,
         };
@@ -217,7 +243,7 @@ function normalizeOpenApiPath(fullPath) {
     const finalPath = cleaned || "/";
     return finalPath.replace(/:([a-zA-Z0-9_]+)/g, "{$1}");
 }
-// Derive tag name from path, e.g. `/api/super_admin/payment_methods` -> `Super Admin - Payment Methods`
+// Derive tag name from path
 function deriveTagFromPath(openApiPath) {
     const segments = openApiPath
         .split("/")
@@ -241,7 +267,6 @@ function extractPathsFromRouter(router, prefix = "/api", paths = {}) {
             const openApiPath = normalizeOpenApiPath(`${prefix}/${routePath}`);
             const methods = Object.keys(layer.route.methods || {}).filter((m) => layer.route.methods[m] && m !== "_all");
             const routeStack = layer.route.stack || [];
-            // Look for validate(zodSchema) middleware and catchAsync(controller) on this route
             let zodSchema = null;
             let controllerName = "";
             for (const subLayer of routeStack) {
@@ -252,11 +277,14 @@ function extractPathsFromRouter(router, prefix = "/api", paths = {}) {
                 if (fn && fn.__controllerName) {
                     controllerName = fn.__controllerName;
                 }
-                else if (fn && fn.name && fn.name !== "handler" && fn.name !== "wrapped" && fn.name !== "<anonymous>") {
+                else if (fn &&
+                    fn.name &&
+                    fn.name !== "handler" &&
+                    fn.name !== "wrapped" &&
+                    fn.name !== "<anonymous>") {
                     controllerName = fn.name;
                 }
             }
-            // Unwrap ZodEffects if root schema is wrapped
             let rootZod = zodSchema;
             while (rootZod && rootZod._def?.typeName === "ZodEffects") {
                 rootZod = rootZod._def.schema;
@@ -285,7 +313,6 @@ function extractPathsFromRouter(router, prefix = "/api", paths = {}) {
                     });
                 }
             }
-            // Also ensure any `{param}` in the route path is documented even without a Zod params schema
             const pathParamMatches = openApiPath.match(/\{([a-zA-Z0-9_]+)\}/g) || [];
             for (const match of pathParamMatches) {
                 const paramName = match.slice(1, -1);
@@ -316,12 +343,20 @@ function extractPathsFromRouter(router, prefix = "/api", paths = {}) {
             let requestBody = undefined;
             if (bodyZod) {
                 const convertedBody = zodNodeToOpenApi(bodyZod).schema;
+                const isUploadRoute = openApiPath.includes("/upload");
                 requestBody = {
                     required: true,
                     content: {
                         "application/json": {
                             schema: convertedBody,
                         },
+                        ...(isUploadRoute
+                            ? {
+                                "multipart/form-data": {
+                                    schema: convertedBody,
+                                },
+                            }
+                            : {}),
                     },
                 };
             }
@@ -365,7 +400,6 @@ function extractPathsFromRouter(router, prefix = "/api", paths = {}) {
             }
         }
         else if (layer.handle && Array.isArray(layer.handle.stack)) {
-            // Mounted Sub-Router
             const mountSegment = layer.__mountPath || layer.path || "";
             const nextPrefix = `${prefix}/${mountSegment}`.replace(/\/+/g, "/");
             extractPathsFromRouter(layer.handle, nextPrefix, paths);
@@ -379,18 +413,26 @@ const setupSwagger = (app, apiRouter) => {
         definition: {
             openapi: "3.0.0",
             info: {
-                title: "E-Commerce Multi-Tenancy API Documentation",
+                title: "Central Super Admin API Documentation",
                 version: "1.0.0",
                 description: "API documentation automatically generated from Express Routes & Zod Validation Schemas",
             },
             servers: [
                 {
-                    url: "http://localhost:3001",
+                    url: "/",
+                    description: "Current Host (Relative URL - Recommended for https://wegostores.com)",
+                },
+                {
+                    url: "https://wegostores.com",
+                    description: "Production Server (WegoStores)",
+                },
+                {
+                    url: "http://localhost:3000",
                     description: "Local Development Server",
                 },
                 {
                     url: "https://salesbcknd.systego.net",
-                    description: "Production Server",
+                    description: "Alternate Production Server",
                 },
             ],
             components: {
@@ -399,9 +441,11 @@ const setupSwagger = (app, apiRouter) => {
                         type: "http",
                         scheme: "bearer",
                         bearerFormat: "JWT",
+                        description: "JWT Bearer token for authentication",
                     },
                 },
             },
+            security: [{ bearerAuth: [] }],
             paths: autoPaths,
         },
         apis: [
@@ -412,12 +456,43 @@ const setupSwagger = (app, apiRouter) => {
         ],
     };
     const swaggerSpec = (0, swagger_jsdoc_1.default)(options);
-    // Merge auto-detected Zod routes with any explicit JSDoc routes
     swaggerSpec.paths = {
         ...autoPaths,
         ...(swaggerSpec.paths || {}),
     };
-    app.use("/api-docs", swagger_ui_express_1.default.serve, swagger_ui_express_1.default.setup(swaggerSpec));
-    console.log("📝 Swagger documentation is available at http://localhost:3001/api-docs");
+    const swaggerUiOptions = {
+        customSiteTitle: "Central Super Admin API Docs",
+        swaggerOptions: {
+            persistAuthorization: true,
+            displayRequestDuration: true,
+            docExpansion: "none",
+            filter: true,
+            tryItOutEnabled: true,
+        },
+    };
+    const serveSpecJson = (_req, res) => {
+        res.setHeader("Content-Type", "application/json");
+        res.json(swaggerSpec);
+    };
+    app.get("/docs-api/json", serveSpecJson);
+    app.get("/api-docs/json", serveSpecJson);
+    app.get("/docs/json", serveSpecJson);
+    app.get("/swagger.json", serveSpecJson);
+    app.get("/api/docs-api/json", serveSpecJson);
+    app.get("/api/api-docs/json", serveSpecJson);
+    const uiPaths = [
+        "/docs-api",
+        "/api-docs",
+        "/docs",
+        "/swagger",
+        "/api/docs-api",
+        "/api/api-docs",
+        "/api/docs",
+    ];
+    for (const uiPath of uiPaths) {
+        app.use(uiPath, swagger_ui_express_1.default.serve);
+        app.get(uiPath, swagger_ui_express_1.default.setup(swaggerSpec, swaggerUiOptions));
+    }
+    console.log("📝 Swagger documentation is available at https://wegostores.com/docs-api");
 };
 exports.setupSwagger = setupSwagger;

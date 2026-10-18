@@ -14,8 +14,12 @@ const drizzle_orm_1 = require("drizzle-orm");
 const bcrypt_1 = __importDefault(require("bcrypt"));
 const Errors_1 = require("../../Errors");
 const response_1 = require("../../utils/response");
-// 1. Get All Admins
+const pagination_1 = require("../../utils/pagination");
+// 1. Get All Admins (Paginated)
 async function getAllAdmin(req, res) {
+    const { page, limit, offset } = (0, pagination_1.getPaginationParams)(req);
+    const [countResult] = await db_1.db.select({ total: (0, drizzle_orm_1.sql) `count(*)` }).from(schema_1.admins);
+    const total = Number(countResult?.total || 0);
     const allAdmins = await db_1.db
         .select({
         id: schema_1.admins.id,
@@ -24,8 +28,13 @@ async function getAllAdmin(req, res) {
         createdAt: schema_1.admins.createdAt,
         updatedAt: schema_1.admins.updatedAt,
     })
-        .from(schema_1.admins);
-    return (0, response_1.SuccessResponse)(res, { admins: allAdmins }, 200);
+        .from(schema_1.admins)
+        .limit(limit)
+        .offset(offset);
+    return (0, response_1.SuccessResponse)(res, {
+        admins: allAdmins,
+        pagination: (0, pagination_1.buildPaginationMeta)(total, page, limit),
+    }, 200);
 }
 // 2. Get Admin By ID
 async function getAdminById(req, res) {

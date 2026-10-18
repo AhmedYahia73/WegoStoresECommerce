@@ -8,6 +8,7 @@ const checkpermission_1 = require("../../middlewares/checkpermission");
 const users_2 = require("../../validators/super_admin/users");
 const router = (0, express_1.Router)();
 router.get("/", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(users_1.getAllUsers));
+router.get("/lists", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(users_1.getUsersLists));
 router.get("/select", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(users_1.getUsersSelection));
 router.get("/:id", (0, checkpermission_1.checkOnlyAdmin)(), (0, validation_1.validate)(users_2.userIdParamSchema), (0, catchAsync_1.catchAsync)(users_1.getUserById));
 router.post("/", (0, checkpermission_1.checkOnlyAdmin)(), (0, validation_1.validate)(users_2.createUserSchema), (0, catchAsync_1.catchAsync)(users_1.createUser));

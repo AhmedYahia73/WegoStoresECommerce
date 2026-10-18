@@ -22,6 +22,7 @@ exports.createUserSchema = zod_1.default.object({
         password: zod_1.default
             .string({ required_error: "Password is required" })
             .min(6, "Password must be at least 6 characters long"),
+        package_id: zod_1.default.string().uuid("Invalid package ID").optional().nullable(),
     }),
 });
 exports.updateUserSchema = zod_1.default.object({
@@ -39,6 +40,7 @@ exports.updateUserSchema = zod_1.default.object({
             .string()
             .min(6, "Password must be at least 6 characters long")
             .optional(),
+        package_id: zod_1.default.string().uuid("Invalid package ID").optional().nullable(),
     }),
 });
 exports.userIdParamSchema = zod_1.default.object({

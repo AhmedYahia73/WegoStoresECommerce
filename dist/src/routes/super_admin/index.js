@@ -9,6 +9,9 @@ const auth_1 = __importDefault(require("./auth"));
 const admins_1 = __importDefault(require("./admins"));
 const paymentMethods_1 = __importDefault(require("./paymentMethods"));
 const users_1 = __importDefault(require("./users"));
+const packages_1 = __importDefault(require("./packages"));
+const discounts_1 = __importDefault(require("./discounts"));
+const userOrders_1 = __importDefault(require("./userOrders"));
 const router = (0, express_1.Router)();
 // Public Super Admin Auth Route (Login via `admins` table)
 router.use("/auth", auth_1.default);
@@ -17,4 +20,7 @@ router.use(authenticated_1.authenticated);
 router.use("/admins", admins_1.default);
 router.use("/payment_methods", paymentMethods_1.default);
 router.use("/users", users_1.default);
+router.use("/packages", packages_1.default);
+router.use("/discounts", discounts_1.default);
+router.use("/user_orders", userOrders_1.default);
 exports.default = router;

@@ -911,9 +911,23 @@ export async function migrateAllTenants(): Promise<MigrationSummary[]> {
   const summaries: MigrationSummary[] = [];
 
   try {
-    const [users] = (await connection.query(
-      "SELECT subdomain FROM users WHERE subdomain IS NOT NULL;"
-    )) as any[];
+    let users: any[] = [];
+    try {
+      const [rows] = (await connection.query(
+        "SELECT subdomain FROM users WHERE subdomain IS NOT NULL;"
+      )) as any[];
+      users = rows;
+    } catch (err: any) {
+      if (err.code === "ER_NO_SUCH_TABLE" || err.errno === 1146) {
+        console.error(`\n❌ Error: Table 'users' does not exist in central database.`);
+        console.error(`   👉 Reasons & Fixes:`);
+        console.error(`   1. Central database tables have not been created yet.`);
+        console.error(`      Run "npm run migrate-db" to create the central tables (users, packages, etc.).`);
+        console.error(`   2. Check DB_NAME in your .env file to ensure it points to the correct database.\n`);
+        return [];
+      }
+      throw err;
+    }
 
     if (!Array.isArray(users) || users.length === 0) {
       console.log("No tenant users found in central database.");
