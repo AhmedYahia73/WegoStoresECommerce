@@ -420,14 +420,18 @@ const setupSwagger = (app, apiRouter) => {
             servers: [
                 {
                     url: "/",
-                    description: "Current Host (Relative URL - Recommended for https://wegostores.com)",
+                    description: "Current Host (Relative URL - Recommended for https://super.wegostores.com)",
+                },
+                {
+                    url: "https://super.wegostores.com",
+                    description: "Super Admin Production Server (WegoStores)",
                 },
                 {
                     url: "https://wegostores.com",
-                    description: "Production Server (WegoStores)",
+                    description: "Main Production Server",
                 },
                 {
-                    url: "http://localhost:3000",
+                    url: "http://localhost:3001",
                     description: "Local Development Server",
                 },
                 {
@@ -461,7 +465,7 @@ const setupSwagger = (app, apiRouter) => {
         ...(swaggerSpec.paths || {}),
     };
     const swaggerUiOptions = {
-        customSiteTitle: "Central Super Admin API Docs",
+        customSiteTitle: "Super Admin API Docs - WegoStores",
         swaggerOptions: {
             persistAuthorization: true,
             displayRequestDuration: true,
@@ -490,9 +494,10 @@ const setupSwagger = (app, apiRouter) => {
         "/api/docs",
     ];
     for (const uiPath of uiPaths) {
-        app.use(uiPath, swagger_ui_express_1.default.serve);
+        app.use(uiPath, swagger_ui_express_1.default.serve, swagger_ui_express_1.default.setup(swaggerSpec, swaggerUiOptions));
         app.get(uiPath, swagger_ui_express_1.default.setup(swaggerSpec, swaggerUiOptions));
+        app.get(`${uiPath}/`, swagger_ui_express_1.default.setup(swaggerSpec, swaggerUiOptions));
     }
-    console.log("📝 Swagger documentation is available at https://wegostores.com/docs-api");
+    console.log("📝 Swagger documentation is available at https://super.wegostores.com/docs-api");
 };
 exports.setupSwagger = setupSwagger;
