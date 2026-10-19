@@ -1135,7 +1135,7 @@ async function runSeed() {
         // 2.20 Payment Gateways Sandbox Credentials
         console.log("   -> Seeding Payment Gateways Sandbox (Gedia, Paymob, Kashier, Fawry)...");
         await connection.query(`
-      INSERT INTO \`${tenantDb}\`.\`paymob\` (\`id\`, \`name\`, \`logo\`, \`api_key\`, \`integration_id\`, \`iframe_id\`, \`hmac\`, \`status\`)
+      INSERT INTO \`${tenantDb}\`.\`paymob\` (\`id\`, \`name\`, \`logo\`, \`api_key\`, \`integration_id\`, \`iframe_id\`, \`hmac\`, \`type\`, \`status\`)
       VALUES (
         UUID(), 
         ?, 
@@ -1144,6 +1144,7 @@ async function runSeed() {
         '123456', 
         '789012', 
         'sandbox_hmac_secret_hash_key', 
+        'test',
         1
       );
     `, [JSON.stringify({ ar: "باي موب (Paymob)", en: "Paymob Gateway" })]);
@@ -1160,13 +1161,14 @@ async function runSeed() {
       );
     `, [JSON.stringify({ ar: "جيديا (Geidea)", en: "Geidea Payments" })]);
         await connection.query(`
-      INSERT INTO \`${tenantDb}\`.\`fawry\` (\`id\`, \`name\`, \`logo\`, \`merchant_code\`, \`security_key\`, \`status\`)
+      INSERT INTO \`${tenantDb}\`.\`fawry\` (\`id\`, \`name\`, \`logo\`, \`merchant_code\`, \`merchant_secret_key\`, \`fawry_base_url\`, \`status\`)
       VALUES (
         UUID(), 
         ?, 
         'https://wegostores.com/uploads/fawry.png', 
         'MERCHANT_TEST_001', 
         'sec_key_fawry_sandbox_test', 
+        'Staging',
         1
       );
     `, [JSON.stringify({ ar: "شبكة فوري (Fawry)", en: "Fawry Gateway" })]);
