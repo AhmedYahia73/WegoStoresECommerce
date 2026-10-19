@@ -263,8 +263,26 @@ async function runSeed() {
         const tenantDb = "ahmed";
         console.log(`🏬 [PART 2] Seeding Tenant Schema: \`${tenantDb}\`...`);
         // 2.1 Create Schema
-        await connection.query(`CREATE DATABASE IF NOT EXISTS \`${tenantDb}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`);
-        await connection.query(`USE \`${tenantDb}\`;`);
+        try {
+            await connection.query(`CREATE DATABASE IF NOT EXISTS \`${tenantDb}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`);
+            console.log(`   ✓ Database \`${tenantDb}\` created or already exists.`);
+        }
+        catch (createErr) {
+            console.warn(`   ⚠️ Warning: Could not run CREATE DATABASE \`${tenantDb}\` (${createErr.sqlMessage || createErr.message}).`);
+            console.warn(`   Attempting to connect to \`${tenantDb}\` directly (in case it was created via Plesk / MySQL)...`);
+        }
+        try {
+            await connection.query(`USE \`${tenantDb}\`;`);
+        }
+        catch (useErr) {
+            console.error(`\n❌ Failed to access database \`${tenantDb}\`.`);
+            console.error(`Reason: User '${user}' does not have privileges to create or use database \`${tenantDb}\`.`);
+            console.error(`\n💡 To solve this on Plesk:`);
+            console.error(`   Run this single command in Plesk terminal / SSH as root:`);
+            console.error(`   plesk db "GRANT ALL PRIVILEGES ON *.* TO '${user}'@'localhost' WITH GRANT OPTION; GRANT ALL PRIVILEGES ON *.* TO '${user}'@'127.0.0.1' WITH GRANT OPTION; GRANT ALL PRIVILEGES ON *.* TO '${user}'@'%' WITH GRANT OPTION; FLUSH PRIVILEGES;"`);
+            console.error(`   OR create database \`${tenantDb}\` in Plesk UI (Databases -> Add Database) and assign user '${user}'.\n`);
+            throw useErr;
+        }
         await connection.query("SET FOREIGN_KEY_CHECKS = 0;");
         // 2.2 Create All 22 Tenant Tables from canonical definitions
         console.log("   -> Ensuring all 22 tenant tables exist in schema `ahmed`...");
