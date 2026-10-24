@@ -4,7 +4,7 @@ import { packages } from "../../models/schema";
 import { eq, inArray, sql } from "drizzle-orm";
 import { NotFound } from "../../Errors";
 import { SuccessResponse } from "../../utils/response";
-import { getLocalizedText } from "../../utils/localization";
+import { getLocalizedText, parseJsonIfNeeded } from "../../utils/localization";
 import { getPaginationParams, buildPaginationMeta } from "../../utils/pagination";
 
 // 1. Get All Packages (Paginated, localized name)
@@ -20,7 +20,7 @@ export async function getAllPackages(req: Request, res: Response) {
   const formatted = list.map((item) => ({
     id: item.id,
     name: getLocalizedText(item.name, lang),
-    names: item.name,
+    names: parseJsonIfNeeded(item.name),
     type: item.type,
     price: item.price,
     status: item.status,
@@ -73,7 +73,7 @@ export async function getPackageById(req: Request, res: Response) {
   const formatted = {
     id: row[0].id,
     name: getLocalizedText(row[0].name, lang),
-    names: row[0].name,
+    names: parseJsonIfNeeded(row[0].name),
     type: row[0].type,
     price: row[0].price,
     status: row[0].status,
@@ -89,7 +89,7 @@ export async function createPackage(req: Request, res: Response) {
   const { name, type, price, status } = req.body;
 
   await db.insert(packages).values({
-    name,
+    name: parseJsonIfNeeded(name),
     type,
     price: String(price),
     status: status ?? true,
@@ -107,7 +107,7 @@ export async function updatePackage(req: Request, res: Response) {
   if (!existing[0]) throw new NotFound("Package not found");
 
   const updateData: Partial<typeof packages.$inferInsert> = {};
-  if (name !== undefined) updateData.name = name;
+  if (name !== undefined) updateData.name = parseJsonIfNeeded(name);
   if (type !== undefined) updateData.type = type;
   if (price !== undefined) updateData.price = String(price);
   if (status !== undefined) updateData.status = status;

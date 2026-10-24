@@ -4,7 +4,7 @@ import { discounts } from "../../models/schema";
 import { eq, inArray, sql } from "drizzle-orm";
 import { NotFound } from "../../Errors";
 import { SuccessResponse } from "../../utils/response";
-import { getLocalizedText } from "../../utils/localization";
+import { getLocalizedText, parseJsonIfNeeded } from "../../utils/localization";
 import { getPaginationParams, buildPaginationMeta } from "../../utils/pagination";
 
 // 1. Get All Discounts (Paginated, localized name)
@@ -20,7 +20,7 @@ export async function getAllDiscounts(req: Request, res: Response) {
   const formatted = list.map((item) => ({
     id: item.id,
     name: getLocalizedText(item.name, lang),
-    names: item.name,
+    names: parseJsonIfNeeded(item.name),
     amount: item.amount,
     type: item.type,
     start_date: item.start_date,
@@ -73,7 +73,7 @@ export async function getDiscountById(req: Request, res: Response) {
   const formatted = {
     id: row[0].id,
     name: getLocalizedText(row[0].name, lang),
-    names: row[0].name,
+    names: parseJsonIfNeeded(row[0].name),
     amount: row[0].amount,
     type: row[0].type,
     start_date: row[0].start_date,
@@ -90,7 +90,7 @@ export async function createDiscount(req: Request, res: Response) {
   const { name, amount, type, start_date, end_date } = req.body;
 
   await db.insert(discounts).values({
-    name,
+    name: parseJsonIfNeeded(name),
     amount: String(amount),
     type,
     start_date,
@@ -109,7 +109,7 @@ export async function updateDiscount(req: Request, res: Response) {
   if (!existing[0]) throw new NotFound("Discount not found");
 
   const updateData: Partial<typeof discounts.$inferInsert> = {};
-  if (name !== undefined) updateData.name = name;
+  if (name !== undefined) updateData.name = parseJsonIfNeeded(name);
   if (amount !== undefined) updateData.amount = String(amount);
   if (type !== undefined) updateData.type = type;
   if (start_date !== undefined) updateData.start_date = start_date;

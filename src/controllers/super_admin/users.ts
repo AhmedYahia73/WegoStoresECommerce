@@ -6,7 +6,7 @@ import bcrypt from "bcrypt";
 import { ConflictError, NotFound } from "../../Errors";
 import { SuccessResponse } from "../../utils/response";
 import { getPaginationParams, buildPaginationMeta } from "../../utils/pagination";
-import { getLocalizedText } from "../../utils/localization";
+import { getLocalizedText, parseJsonIfNeeded } from "../../utils/localization";
 import { calculateSubscriptionEndDate } from "../../utils/subscription";
 import {
   createTenantSchema,
@@ -63,7 +63,7 @@ export async function getAllUsers(req: Request, res: Response) {
   const formattedUsers = allUsers.map((user) => ({
     ...user,
     package_name: user.package_name ? getLocalizedText(user.package_name, lang) : null,
-    package_names: user.package_name ?? null,
+    package_names: user.package_name ? parseJsonIfNeeded(user.package_name) : null,
     orders_count: countsMap.get(user.id) || 0,
   }));
 
@@ -151,7 +151,7 @@ export async function getUserById(req: Request, res: Response) {
   const formatted = {
     ...userRow[0],
     package_name: userRow[0].package_name ? getLocalizedText(userRow[0].package_name, lang) : null,
-    package_names: userRow[0].package_name ?? null,
+    package_names: userRow[0].package_name ? parseJsonIfNeeded(userRow[0].package_name) : null,
     orders_count: Number(orderCountRow?.count || 0),
   };
 
@@ -221,7 +221,16 @@ export async function createUser(req: Request, res: Response) {
   try {
     await createTenantSchema(subdomain);
   } catch (schemaError) {
-    await db.delete(users).where(eq(users.subdomain, subdomain));
+    try {
+      await db.delete(users).where(eq(users.subdomain, subdomain));
+    } catch (cleanupUserErr) {
+      console.error(`Rollback: Failed to delete user "${subdomain}":`, cleanupUserErr);
+    }
+    try {
+      await deleteTenantSchema(subdomain);
+    } catch (cleanupSchemaErr) {
+      console.error(`Rollback: Failed to drop schema "${subdomain}":`, cleanupSchemaErr);
+    }
     throw schemaError;
   }
 
