@@ -1,5 +1,6 @@
 import mysql from "mysql2/promise";
 import "dotenv/config";
+import { syncCentralSchema } from "../utils/syncCentralSchema";
 
 async function createDatabaseAndTables() {
   const host = process.env.DB_HOST || "127.0.0.1";
@@ -26,8 +27,9 @@ async function createDatabaseAndTables() {
   // 2. Select the database
   await connection.query(`USE \`${dbName}\`;`);
 
-  // 3. Create central tables
+  // 3. Create / sync central tables
   await connection.query("SET FOREIGN_KEY_CHECKS = 0;");
+  await syncCentralSchema(connection, dbName);
 
   // Table 1: admins
   await connection.query(`

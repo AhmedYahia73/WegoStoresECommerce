@@ -2,6 +2,7 @@ import mysql from "mysql2/promise";
 import bcrypt from "bcrypt";
 import "dotenv/config";
 import { TENANT_TABLE_DEFINITIONS } from "../services/tenantSchemaService";
+import { syncCentralSchema } from "../utils/syncCentralSchema";
 
 async function runSeed() {
   const host = process.env.DB_HOST || "127.0.0.1";
@@ -36,6 +37,7 @@ async function runSeed() {
     );
     await connection.query(`USE \`${centralDbName}\`;`);
     await connection.query("SET FOREIGN_KEY_CHECKS = 0;");
+    await syncCentralSchema(connection, centralDbName);
 
     // 1.1 Central Admins
     console.log("   -> Seeding Central Admins...");
