@@ -3,10 +3,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.upload = void 0;
+exports.uploadDocumentOrImage = exports.upload = void 0;
 exports.parseFormDataJson = parseFormDataJson;
 exports.getFileUrl = getFileUrl;
 exports.uploadSingleImage = uploadSingleImage;
+exports.uploadSingleFile = uploadSingleFile;
 exports.uploadMultipleImages = uploadMultipleImages;
 exports.uploadFieldsImages = uploadFieldsImages;
 const multer_1 = __importDefault(require("multer"));
@@ -35,9 +36,24 @@ const fileFilter = (_req, file, cb) => {
         cb(new BadRequest_1.BadRequest("Only image files are allowed"));
     }
 };
+const documentOrImageFilter = (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/") || file.mimetype === "application/pdf") {
+        cb(null, true);
+    }
+    else {
+        cb(new BadRequest_1.BadRequest("Only image or PDF files are allowed"));
+    }
+};
 exports.upload = (0, multer_1.default)({
     storage,
     fileFilter,
+    limits: {
+        fileSize: 15 * 1024 * 1024, // 15MB limit
+    },
+});
+exports.uploadDocumentOrImage = (0, multer_1.default)({
+    storage,
+    fileFilter: documentOrImageFilter,
     limits: {
         fileSize: 15 * 1024 * 1024, // 15MB limit
     },
@@ -81,10 +97,10 @@ function getFileUrl(req, file) {
     return `${req.protocol}://${req.get("host")}/uploads/${file.filename}`;
 }
 /**
- * Middleware for single image upload via multipart/form-data.
+ * Shared single-file upload wrapper for multipart/form-data.
  */
-function uploadSingleImage(fieldName = "image") {
-    const multerMiddleware = exports.upload.single(fieldName);
+function wrapSingleUpload(multerInstance, fieldName) {
+    const multerMiddleware = multerInstance.single(fieldName);
     return (req, res, next) => {
         multerMiddleware(req, res, (err) => {
             if (err)
@@ -97,6 +113,18 @@ function uploadSingleImage(fieldName = "image") {
             });
         });
     };
+}
+/**
+ * Middleware for single image upload via multipart/form-data.
+ */
+function uploadSingleImage(fieldName = "image") {
+    return wrapSingleUpload(exports.upload, fieldName);
+}
+/**
+ * Middleware for single file upload (image or PDF) via multipart/form-data.
+ */
+function uploadSingleFile(fieldName = "file") {
+    return wrapSingleUpload(exports.uploadDocumentOrImage, fieldName);
 }
 /**
  * Middleware for multiple images upload under the same fieldName.

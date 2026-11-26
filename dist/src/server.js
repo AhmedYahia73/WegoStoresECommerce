@@ -15,6 +15,7 @@ const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const helmet_1 = __importDefault(require("helmet"));
 const http_1 = __importDefault(require("http"));
 const socket_io_1 = require("socket.io");
+const orderLimitService_1 = require("./services/orderLimitService");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.set("trust proxy", true);
@@ -57,4 +58,5 @@ app.use(errorHandler_1.errorHandler);
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
+    (0, orderLimitService_1.startOrderLimitMonitor)();
 });

@@ -20,14 +20,20 @@ async function getAllPackages(req, res) {
     const { page, limit, offset } = (0, pagination_1.getPaginationParams)(req);
     const [countResult] = await db_1.db.select({ total: (0, drizzle_orm_1.sql) `count(*)` }).from(schema_1.packages);
     const total = Number(countResult?.total || 0);
-    const list = await db_1.db.select().from(schema_1.packages).limit(limit).offset(offset);
+    const list = await db_1.db
+        .select()
+        .from(schema_1.packages)
+        .orderBy((0, drizzle_orm_1.asc)(schema_1.packages.sort))
+        .limit(limit)
+        .offset(offset);
     const formatted = list.map((item) => ({
         id: item.id,
         name: (0, localization_1.getLocalizedText)(item.name, lang),
-        names: item.name,
-        type: item.type,
+        names: (0, localization_1.parseJsonIfNeeded)(item.name),
         price: item.price,
-        status: item.status,
+        orders_from: item.orders_from,
+        orders_to: item.orders_to,
+        sort: item.sort,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
     }));
@@ -43,16 +49,20 @@ async function getPackagesSelection(req, res) {
         .select({
         id: schema_1.packages.id,
         name: schema_1.packages.name,
-        type: schema_1.packages.type,
         price: schema_1.packages.price,
+        orders_from: schema_1.packages.orders_from,
+        orders_to: schema_1.packages.orders_to,
+        sort: schema_1.packages.sort,
     })
         .from(schema_1.packages)
-        .where((0, drizzle_orm_1.eq)(schema_1.packages.status, true));
+        .orderBy((0, drizzle_orm_1.asc)(schema_1.packages.sort));
     const formatted = list.map((item) => ({
         id: item.id,
         name: (0, localization_1.getLocalizedText)(item.name, lang),
-        type: item.type,
         price: item.price,
+        orders_from: item.orders_from,
+        orders_to: item.orders_to,
+        sort: item.sort,
     }));
     return (0, response_1.SuccessResponse)(res, { packages: formatted }, 200);
 }
@@ -66,10 +76,11 @@ async function getPackageById(req, res) {
     const formatted = {
         id: row[0].id,
         name: (0, localization_1.getLocalizedText)(row[0].name, lang),
-        names: row[0].name,
-        type: row[0].type,
+        names: (0, localization_1.parseJsonIfNeeded)(row[0].name),
         price: row[0].price,
-        status: row[0].status,
+        orders_from: row[0].orders_from,
+        orders_to: row[0].orders_to,
+        sort: row[0].sort,
         createdAt: row[0].createdAt,
         updatedAt: row[0].updatedAt,
     };
@@ -77,31 +88,39 @@ async function getPackageById(req, res) {
 }
 // 4. Create Package
 async function createPackage(req, res) {
-    const { name, type, price, status } = req.body;
+    const { name, price, orders_from, orders_to, sort } = req.body;
     await db_1.db.insert(schema_1.packages).values({
-        name,
-        type,
+        name: (0, localization_1.parseJsonIfNeeded)(name),
         price: String(price),
-        status: status ?? true,
+        orders_from,
+        orders_to: orders_to ?? null,
+        sort,
     });
     return (0, response_1.SuccessResponse)(res, { message: "Package created successfully" }, 201);
 }
 // 5. Update Package
 async function updatePackage(req, res) {
     const { id } = req.params;
-    const { name, type, price, status } = req.body;
+    const { name, price, orders_from, orders_to, sort } = req.body;
     const existing = await db_1.db.select().from(schema_1.packages).where((0, drizzle_orm_1.eq)(schema_1.packages.id, id)).limit(1);
     if (!existing[0])
         throw new Errors_1.NotFound("Package not found");
+    const nextOrdersFrom = orders_from !== undefined ? orders_from : existing[0].orders_from;
+    const nextOrdersTo = orders_to !== undefined ? orders_to : existing[0].orders_to;
+    if (nextOrdersTo !== null && nextOrdersTo < nextOrdersFrom) {
+        throw new Errors_1.BadRequest("orders_to must be greater than or equal to orders_from");
+    }
     const updateData = {};
     if (name !== undefined)
-        updateData.name = name;
-    if (type !== undefined)
-        updateData.type = type;
+        updateData.name = (0, localization_1.parseJsonIfNeeded)(name);
     if (price !== undefined)
         updateData.price = String(price);
-    if (status !== undefined)
-        updateData.status = status;
+    if (orders_from !== undefined)
+        updateData.orders_from = orders_from;
+    if (orders_to !== undefined)
+        updateData.orders_to = orders_to;
+    if (sort !== undefined)
+        updateData.sort = sort;
     if (Object.keys(updateData).length > 0) {
         await db_1.db.update(schema_1.packages).set(updateData).where((0, drizzle_orm_1.eq)(schema_1.packages.id, id));
     }

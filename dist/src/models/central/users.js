@@ -6,6 +6,7 @@ const drizzle_orm_1 = require("drizzle-orm");
 const orders_1 = require("./orders");
 const packages_1 = require("./packages");
 const userOrders_1 = require("./userOrders");
+const walletOrders_1 = require("./walletOrders");
 exports.users = (0, mysql_core_1.mysqlTable)("users", {
     id: (0, mysql_core_1.char)("id", { length: 36 })
         .primaryKey()
@@ -18,6 +19,11 @@ exports.users = (0, mysql_core_1.mysqlTable)("users", {
     package_id: (0, mysql_core_1.char)("package_id", { length: 36 }).references(() => packages_1.packages.id, {
         onDelete: "set null",
     }),
+    orders_from: (0, mysql_core_1.int)("orders_from").notNull().default(0),
+    orders_to: (0, mysql_core_1.int)("orders_to").default(0),
+    orders: (0, mysql_core_1.int)("orders").notNull().default(0),
+    upgrade_notified: (0, mysql_core_1.boolean)("upgrade_notified").notNull().default(false),
+    wallet: (0, mysql_core_1.decimal)("wallet", { precision: 10, scale: 2 }).notNull().default("0.00"),
     start_date: (0, mysql_core_1.date)("start_date", { mode: "string" }),
     end_date: (0, mysql_core_1.date)("end_date", { mode: "string" }),
     createdAt: (0, mysql_core_1.timestamp)("created_at").defaultNow().notNull(),
@@ -30,4 +36,5 @@ exports.usersRelations = (0, drizzle_orm_1.relations)(exports.users, ({ one, man
     }),
     orders: many(orders_1.orders),
     userOrders: many(userOrders_1.userOrders),
+    walletOrders: many(walletOrders_1.walletOrders),
 }));

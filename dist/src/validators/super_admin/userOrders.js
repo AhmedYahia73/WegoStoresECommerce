@@ -8,18 +8,11 @@ const zod_1 = __importDefault(require("zod"));
 exports.createUserOrderSchema = zod_1.default.object({
     body: zod_1.default.object({
         package_id: zod_1.default.string({ required_error: "Package ID is required" }).uuid("Invalid package ID"),
-        discount_id: zod_1.default.string().uuid("Invalid discount ID").optional().nullable(),
         price: zod_1.default.union([zod_1.default.number(), zod_1.default.string().regex(/^\d+(\.\d{1,2})?$/)], {
             required_error: "Price is required",
         }),
-        discount: zod_1.default
-            .union([zod_1.default.number(), zod_1.default.string().regex(/^\d+(\.\d{1,2})?$/)])
-            .optional()
-            .default(0),
-        final_price: zod_1.default.union([zod_1.default.number(), zod_1.default.string().regex(/^\d+(\.\d{1,2})?$/)], {
-            required_error: "Final price is required",
-        }),
         user_id: zod_1.default.string({ required_error: "User ID is required" }).uuid("Invalid user ID"),
+        receipt: zod_1.default.string().min(1, "Receipt cannot be empty").optional().nullable(),
     }),
 });
 exports.changeUserOrderStatusSchema = zod_1.default.object({

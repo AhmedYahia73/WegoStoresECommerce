@@ -8,8 +8,7 @@ const checkpermission_1 = require("../../middlewares/checkpermission");
 const packages_2 = require("../../validators/super_admin/packages");
 const common_1 = require("../../validators/super_admin/common");
 const router = (0, express_1.Router)();
-// Bulk delete operations (MUST precede /:id)
-router.post("/bulk-delete", (0, checkpermission_1.checkOnlyAdmin)(), (0, validation_1.validate)(common_1.bulkDeleteSchema), (0, catchAsync_1.catchAsync)(packages_1.bulkDeletePackages));
+// Bulk delete operation (MUST precede /:id)
 router.delete("/bulk", (0, checkpermission_1.checkOnlyAdmin)(), (0, validation_1.validate)(common_1.bulkDeleteSchema), (0, catchAsync_1.catchAsync)(packages_1.bulkDeletePackages));
 // Query operations
 router.get("/", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(packages_1.getAllPackages));

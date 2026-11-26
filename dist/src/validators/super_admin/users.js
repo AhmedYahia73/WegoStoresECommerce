@@ -23,6 +23,13 @@ exports.createUserSchema = zod_1.default.object({
             .string({ required_error: "Password is required" })
             .min(6, "Password must be at least 6 characters long"),
         package_id: zod_1.default.string().uuid("Invalid package ID").optional().nullable(),
+        wallet: zod_1.default
+            .union([
+            zod_1.default.number().nonnegative("wallet must be >= 0"),
+            zod_1.default.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid wallet amount"),
+        ])
+            .optional()
+            .default(0),
     }),
 });
 exports.updateUserSchema = zod_1.default.object({
@@ -41,6 +48,12 @@ exports.updateUserSchema = zod_1.default.object({
             .min(6, "Password must be at least 6 characters long")
             .optional(),
         package_id: zod_1.default.string().uuid("Invalid package ID").optional().nullable(),
+        wallet: zod_1.default
+            .union([
+            zod_1.default.number().nonnegative("wallet must be >= 0"),
+            zod_1.default.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid wallet amount"),
+        ])
+            .optional(),
     }),
 });
 exports.userIdParamSchema = zod_1.default.object({

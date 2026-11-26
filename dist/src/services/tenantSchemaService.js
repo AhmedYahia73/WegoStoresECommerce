@@ -639,7 +639,7 @@ exports.TENANT_TABLE_DEFINITIONS = [
         \`iframe_id\` VARCHAR(255) NOT NULL,
         \`integration_id\` VARCHAR(255) NOT NULL,
         \`hmac\` TEXT NOT NULL,
-        \`type\` ENUM('test', 'live') NOT NULL DEFAULT 'test'" },
+        \`type\` ENUM('test', 'live') NOT NULL DEFAULT 'test',
         \`status\` BOOLEAN NOT NULL DEFAULT 1,
         \`callback_url\` VARCHAR(500) DEFAULT '{subdomain}/api/paymob_callback',
         \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -718,7 +718,6 @@ async function createTenantSchema(subdomain) {
         // 1. Create the tenant database / schema
         await connection.query(`CREATE DATABASE IF NOT EXISTS \`${subdomain}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`);
         // 2. Switch context to the new tenant schema
-        await connection.query(`USE \`${subdomain}\`;`);
         // 3. Create all tables from canonical definitions
         for (const tableDef of exports.TENANT_TABLE_DEFINITIONS) {
             await connection.query(tableDef.createSql(subdomain));

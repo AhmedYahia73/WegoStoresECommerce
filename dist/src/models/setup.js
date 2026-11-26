@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const promise_1 = __importDefault(require("mysql2/promise"));
 require("dotenv/config");
+const syncCentralSchema_1 = require("../utils/syncCentralSchema");
 async function createDatabaseAndTables() {
     const host = process.env.DB_HOST || "127.0.0.1";
     const port = Number(process.env.DB_PORT) || 3306;
@@ -23,8 +24,9 @@ async function createDatabaseAndTables() {
     console.log(`✓ Database "${dbName}" checked/created successfully.`);
     // 2. Select the database
     await connection.query(`USE \`${dbName}\`;`);
-    // 3. Create central tables
+    // 3. Create / sync central tables
     await connection.query("SET FOREIGN_KEY_CHECKS = 0;");
+    await (0, syncCentralSchema_1.syncCentralSchema)(connection, dbName);
     // Table 1: admins
     await connection.query(`
     CREATE TABLE IF NOT EXISTS \`admins\` (
@@ -41,9 +43,10 @@ async function createDatabaseAndTables() {
     CREATE TABLE IF NOT EXISTS \`packages\` (
       \`id\` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
       \`name\` JSON NOT NULL,
-      \`type\` ENUM('monthly', 'quarterly', 'biannual', 'annual') NOT NULL DEFAULT 'monthly',
       \`price\` DECIMAL(10, 2) NOT NULL,
-      \`status\` BOOLEAN NOT NULL DEFAULT 1,
+      \`orders_from\` INT NOT NULL DEFAULT 0,
+      \`orders_to\` INT NULL,
+      \`sort\` INT NOT NULL DEFAULT 0,
       \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -60,20 +63,7 @@ async function createDatabaseAndTables() {
       \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   `);
-    // Table 4: discounts
-    await connection.query(`
-    CREATE TABLE IF NOT EXISTS \`discounts\` (
-      \`id\` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
-      \`name\` JSON NOT NULL,
-      \`amount\` DECIMAL(10, 2) NOT NULL,
-      \`type\` ENUM('percentage', 'value') NOT NULL DEFAULT 'percentage',
-      \`start_date\` DATE NOT NULL,
-      \`end_date\` DATE NOT NULL,
-      \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-  `);
-    // Table 5: users (Tenants)
+    // Table 4: users (Tenants)
     await connection.query(`
     CREATE TABLE IF NOT EXISTS \`users\` (
       \`id\` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
@@ -83,6 +73,11 @@ async function createDatabaseAndTables() {
       \`phone\` VARCHAR(50) NOT NULL UNIQUE,
       \`password\` VARCHAR(255) NOT NULL,
       \`package_id\` CHAR(36),
+      \`orders_from\` INT NOT NULL DEFAULT 0,
+      \`orders_to\` INT DEFAULT 0,
+      \`orders\` INT NOT NULL DEFAULT 0,
+      \`upgrade_notified\` BOOLEAN NOT NULL DEFAULT 0,
+      \`wallet\` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
       \`start_date\` DATE,
       \`end_date\` DATE,
       \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -90,7 +85,7 @@ async function createDatabaseAndTables() {
       CONSTRAINT \`fk_users_package\` FOREIGN KEY (\`package_id\`) REFERENCES \`packages\` (\`id\`) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   `);
-    // Table 6: orders
+    // Table 5: orders
     await connection.query(`
     CREATE TABLE IF NOT EXISTS \`orders\` (
       \`id\` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
@@ -101,34 +96,66 @@ async function createDatabaseAndTables() {
       CONSTRAINT \`fk_orders_user\` FOREIGN KEY (\`user_id\`) REFERENCES \`users\` (\`id\`) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   `);
-    // Table 7: user_orders
+    // Table 6: user_orders
     await connection.query(`
     CREATE TABLE IF NOT EXISTS \`user_orders\` (
       \`id\` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
       \`package_id\` CHAR(36) NOT NULL,
-      \`discount_id\` CHAR(36),
       \`price\` DECIMAL(10, 2) NOT NULL,
-      \`discount\` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-      \`final_price\` DECIMAL(10, 2) NOT NULL,
       \`user_id\` CHAR(36) NOT NULL,
-      \`status\` ENUM('pending', 'approve', 'reject') NOT NULL DEFAULT 'pending',
+      \`status\` ENUM('pending', 'approve', 'reject', 'faild') NOT NULL DEFAULT 'pending',
       \`reject_reason\` TEXT,
+      \`receipt\` VARCHAR(500),
+      \`transaction_id\` VARCHAR(255),
       \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       CONSTRAINT \`fk_user_orders_package\` FOREIGN KEY (\`package_id\`) REFERENCES \`packages\` (\`id\`) ON DELETE RESTRICT,
-      CONSTRAINT \`fk_user_orders_discount\` FOREIGN KEY (\`discount_id\`) REFERENCES \`discounts\` (\`id\`) ON DELETE SET NULL,
       CONSTRAINT \`fk_user_orders_user\` FOREIGN KEY (\`user_id\`) REFERENCES \`users\` (\`id\`) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   `);
+    // Table 7: wallet_orders
+    await connection.query(`
+    CREATE TABLE IF NOT EXISTS \`wallet_orders\` (
+      \`id\` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+      \`wallet\` DECIMAL(10, 2) NOT NULL,
+      \`user_id\` CHAR(36) NOT NULL,
+      \`status\` ENUM('pending', 'approve', 'reject', 'faild') NOT NULL DEFAULT 'pending',
+      \`reject_reason\` TEXT,
+      \`receipt\` VARCHAR(500),
+      \`transaction_id\` VARCHAR(255),
+      \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      CONSTRAINT \`fk_wallet_orders_user\` FOREIGN KEY (\`user_id\`) REFERENCES \`users\` (\`id\`) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `);
+    // Table 8: paymob
+    await connection.query(`
+    CREATE TABLE IF NOT EXISTS \`paymob\` (
+      \`id\` CHAR(36) NOT NULL DEFAULT (UUID()),
+      \`name\` JSON NOT NULL,
+      \`logo\` VARCHAR(500) NOT NULL,
+      \`api_key\` TEXT NOT NULL,
+      \`iframe_id\` VARCHAR(255) NOT NULL,
+      \`integration_id\` VARCHAR(255) NOT NULL,
+      \`hmac\` TEXT NOT NULL,
+      \`type\` ENUM('test', 'live') NOT NULL DEFAULT 'test',
+      \`status\` BOOLEAN NOT NULL DEFAULT true,
+      \`callback_url\` VARCHAR(500) DEFAULT '{subdomain}/api/paymob_callback',
+      \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `);
     await connection.query("SET FOREIGN_KEY_CHECKS = 1;");
-    console.log(`✓ All 7 central tables verified/created successfully in "${dbName}":`);
+    console.log(`✓ All 8 central tables verified/created successfully in "${dbName}":`);
     console.log(`  - admins`);
     console.log(`  - packages`);
     console.log(`  - payment_methods`);
-    console.log(`  - discounts`);
     console.log(`  - users`);
     console.log(`  - orders`);
     console.log(`  - user_orders`);
+    console.log(`  - wallet_orders`);
+    console.log(`  - paymob`);
     await connection.end();
 }
 createDatabaseAndTables().catch((err) => {

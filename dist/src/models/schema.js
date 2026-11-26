@@ -20,5 +20,6 @@ __exportStar(require("./central/packages"), exports);
 __exportStar(require("./central/paymentMethods"), exports);
 __exportStar(require("./central/admins"), exports);
 __exportStar(require("./central/orders"), exports);
-__exportStar(require("./central/discounts"), exports);
 __exportStar(require("./central/userOrders"), exports);
+__exportStar(require("./central/walletOrders"), exports);
+__exportStar(require("./central/paymob"), exports);

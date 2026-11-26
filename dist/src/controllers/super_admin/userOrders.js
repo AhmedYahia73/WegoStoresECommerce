@@ -4,6 +4,7 @@ exports.getAllUserOrders = getAllUserOrders;
 exports.getUserOrdersLists = getUserOrdersLists;
 exports.getUserOrderById = getUserOrderById;
 exports.createUserOrder = createUserOrder;
+exports.approveUserOrderRecord = approveUserOrderRecord;
 exports.changeUserOrderStatus = changeUserOrderStatus;
 exports.deleteUserOrder = deleteUserOrder;
 exports.bulkDeleteUserOrders = bulkDeleteUserOrders;
@@ -15,12 +16,13 @@ const response_1 = require("../../utils/response");
 const localization_1 = require("../../utils/localization");
 const subscription_1 = require("../../utils/subscription");
 const pagination_1 = require("../../utils/pagination");
+const handleImages_1 = require("../../utils/handleImages");
 // 1. Get All User Orders (Paginated with filters: user_id, package_id, status, from, to date range)
 async function getAllUserOrders(req, res) {
     const lang = req.query.lang;
     const { page, limit, offset } = (0, pagination_1.getPaginationParams)(req);
     const { user_id, package_id, status, from, to } = req.query;
-    const conditions = [];
+    const conditions = [(0, drizzle_orm_1.ne)(schema_1.userOrders.status, "faild")];
     if (user_id && typeof user_id === "string") {
         conditions.push((0, drizzle_orm_1.eq)(schema_1.userOrders.user_id, user_id));
     }
@@ -48,41 +50,34 @@ async function getAllUserOrders(req, res) {
         .select({
         id: schema_1.userOrders.id,
         price: schema_1.userOrders.price,
-        discount: schema_1.userOrders.discount,
-        final_price: schema_1.userOrders.final_price,
         user_id: schema_1.userOrders.user_id,
         user_name: schema_1.users.name,
         user_phone: schema_1.users.phone,
         package_id: schema_1.userOrders.package_id,
         package_name: schema_1.packages.name,
-        discount_id: schema_1.userOrders.discount_id,
-        discount_name: schema_1.discounts.name,
         status: schema_1.userOrders.status,
         reject_reason: schema_1.userOrders.reject_reason,
+        receipt: schema_1.userOrders.receipt,
         createdAt: schema_1.userOrders.createdAt,
         updatedAt: schema_1.userOrders.updatedAt,
     })
         .from(schema_1.userOrders)
         .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.userOrders.user_id, schema_1.users.id))
         .leftJoin(schema_1.packages, (0, drizzle_orm_1.eq)(schema_1.userOrders.package_id, schema_1.packages.id))
-        .leftJoin(schema_1.discounts, (0, drizzle_orm_1.eq)(schema_1.userOrders.discount_id, schema_1.discounts.id))
         .where(whereClause)
         .limit(limit)
         .offset(offset);
     const formatted = list.map((item) => ({
         id: item.id,
         price: item.price,
-        discount: item.discount,
-        final_price: item.final_price,
         user_id: item.user_id,
         user_name: item.user_name,
         user_phone: item.user_phone,
         package_id: item.package_id,
         package_name: item.package_name ? (0, localization_1.getLocalizedText)(item.package_name, lang) : null,
-        discount_id: item.discount_id,
-        discount_name: item.discount_name ? (0, localization_1.getLocalizedText)(item.discount_name, lang) : null,
         status: item.status,
         reject_reason: item.reject_reason,
+        receipt: item.receipt,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
     }));
@@ -105,35 +100,24 @@ async function getUserOrdersLists(req, res) {
         .select({
         id: schema_1.packages.id,
         name: schema_1.packages.name,
-        type: schema_1.packages.type,
         price: schema_1.packages.price,
+        orders_from: schema_1.packages.orders_from,
+        orders_to: schema_1.packages.orders_to,
+        sort: schema_1.packages.sort,
     })
         .from(schema_1.packages)
-        .where((0, drizzle_orm_1.eq)(schema_1.packages.status, true));
+        .orderBy((0, drizzle_orm_1.asc)(schema_1.packages.sort));
     const formattedPackages = packagesList.map((pkg) => ({
         id: pkg.id,
         name: (0, localization_1.getLocalizedText)(pkg.name, lang),
-        type: pkg.type,
         price: pkg.price,
-    }));
-    const discountsList = await db_1.db
-        .select({
-        id: schema_1.discounts.id,
-        name: schema_1.discounts.name,
-        amount: schema_1.discounts.amount,
-        type: schema_1.discounts.type,
-    })
-        .from(schema_1.discounts);
-    const formattedDiscounts = discountsList.map((d) => ({
-        id: d.id,
-        name: (0, localization_1.getLocalizedText)(d.name, lang),
-        amount: d.amount,
-        type: d.type,
+        orders_from: pkg.orders_from,
+        orders_to: pkg.orders_to,
+        sort: pkg.sort,
     }));
     return (0, response_1.SuccessResponse)(res, {
         users: usersList,
         packages: formattedPackages,
-        discounts: formattedDiscounts,
     }, 200);
 }
 // 3. Get User Order By ID
@@ -144,38 +128,33 @@ async function getUserOrderById(req, res) {
         .select({
         id: schema_1.userOrders.id,
         price: schema_1.userOrders.price,
-        discount: schema_1.userOrders.discount,
-        final_price: schema_1.userOrders.final_price,
         user_id: schema_1.userOrders.user_id,
         user_name: schema_1.users.name,
         user_phone: schema_1.users.phone,
         package_id: schema_1.userOrders.package_id,
         package_name: schema_1.packages.name,
-        discount_id: schema_1.userOrders.discount_id,
-        discount_name: schema_1.discounts.name,
         status: schema_1.userOrders.status,
         reject_reason: schema_1.userOrders.reject_reason,
+        receipt: schema_1.userOrders.receipt,
         createdAt: schema_1.userOrders.createdAt,
         updatedAt: schema_1.userOrders.updatedAt,
     })
         .from(schema_1.userOrders)
         .leftJoin(schema_1.users, (0, drizzle_orm_1.eq)(schema_1.userOrders.user_id, schema_1.users.id))
         .leftJoin(schema_1.packages, (0, drizzle_orm_1.eq)(schema_1.userOrders.package_id, schema_1.packages.id))
-        .leftJoin(schema_1.discounts, (0, drizzle_orm_1.eq)(schema_1.userOrders.discount_id, schema_1.discounts.id))
-        .where((0, drizzle_orm_1.eq)(schema_1.userOrders.id, id))
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.userOrders.id, id), (0, drizzle_orm_1.ne)(schema_1.userOrders.status, "faild")))
         .limit(1);
     if (!row[0])
         throw new Errors_1.NotFound("Order not found");
     const formatted = {
         ...row[0],
         package_name: row[0].package_name ? (0, localization_1.getLocalizedText)(row[0].package_name, lang) : null,
-        discount_name: row[0].discount_name ? (0, localization_1.getLocalizedText)(row[0].discount_name, lang) : null,
     };
     return (0, response_1.SuccessResponse)(res, { user_order: formatted }, 200);
 }
 // 4. Create User Order
 async function createUserOrder(req, res) {
-    const { package_id, discount_id, price, discount, final_price, user_id } = req.body;
+    const { package_id, price, user_id, receipt } = req.body;
     // Verify user exists
     const user = await db_1.db.select({ id: schema_1.users.id }).from(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.id, user_id)).limit(1);
     if (!user[0])
@@ -184,16 +163,71 @@ async function createUserOrder(req, res) {
     const pkg = await db_1.db.select({ id: schema_1.packages.id }).from(schema_1.packages).where((0, drizzle_orm_1.eq)(schema_1.packages.id, package_id)).limit(1);
     if (!pkg[0])
         throw new Errors_1.NotFound("Package not found");
+    const receiptUrl = receipt ? await (0, handleImages_1.uploadImage)(req, receipt, "user_orders") : null;
     await db_1.db.insert(schema_1.userOrders).values({
         package_id,
-        discount_id: discount_id ?? null,
         price: String(price),
-        discount: String(discount ?? 0),
-        final_price: String(final_price),
         user_id,
         status: "pending",
+        receipt: receiptUrl || null,
     });
     return (0, response_1.SuccessResponse)(res, { message: "User order created successfully" }, 201);
+}
+// Shared helper to approve a user order and activate the user's package subscription
+async function approveUserOrderRecord(order, options) {
+    const pkgRows = await db_1.db
+        .select()
+        .from(schema_1.packages)
+        .where((0, drizzle_orm_1.eq)(schema_1.packages.id, order.package_id))
+        .limit(1);
+    if (!pkgRows[0]) {
+        throw new Errors_1.NotFound("Associated package not found");
+    }
+    if (options?.idempotent && order.status === "approve") {
+        return {
+            alreadyApproved: true,
+            subscription: {
+                package_id: order.package_id,
+                orders_from: pkgRows[0].orders_from,
+                orders_to: pkgRows[0].orders_to,
+            },
+        };
+    }
+    const now = new Date();
+    const startDateStr = now.toISOString().split("T")[0];
+    const endDateStr = (0, subscription_1.calculateSubscriptionEndDate)(now);
+    await db_1.db.transaction(async (tx) => {
+        // 1. Update user: package_id, orders_from/to from package, start_date = now(), end_date = +1 month
+        await tx
+            .update(schema_1.users)
+            .set({
+            package_id: order.package_id,
+            orders_from: pkgRows[0].orders_from,
+            orders_to: pkgRows[0].orders_to,
+            upgrade_notified: false,
+            start_date: startDateStr,
+            end_date: endDateStr,
+        })
+            .where((0, drizzle_orm_1.eq)(schema_1.users.id, order.user_id));
+        // 2. Update order status: approve
+        await tx
+            .update(schema_1.userOrders)
+            .set({
+            status: "approve",
+            reject_reason: null,
+        })
+            .where((0, drizzle_orm_1.eq)(schema_1.userOrders.id, order.id));
+    });
+    return {
+        alreadyApproved: false,
+        subscription: {
+            package_id: order.package_id,
+            orders_from: pkgRows[0].orders_from,
+            orders_to: pkgRows[0].orders_to,
+            start_date: startDateStr,
+            end_date: endDateStr,
+        },
+    };
 }
 // 5. Change Order Status (Approve or Reject)
 async function changeUserOrderStatus(req, res) {
@@ -221,44 +255,11 @@ async function changeUserOrderStatus(req, res) {
         return (0, response_1.SuccessResponse)(res, { message: "Order rejected successfully", status: "reject", reject_reason }, 200);
     }
     if (status === "approve") {
-        // Fetch package to calculate dates based on its type
-        const pkgRows = await db_1.db
-            .select()
-            .from(schema_1.packages)
-            .where((0, drizzle_orm_1.eq)(schema_1.packages.id, order.package_id))
-            .limit(1);
-        if (!pkgRows[0]) {
-            throw new Errors_1.NotFound("Associated package not found");
-        }
-        const now = new Date();
-        const startDateStr = now.toISOString().split("T")[0];
-        const endDateStr = (0, subscription_1.calculateSubscriptionEndDate)(now, pkgRows[0].type);
-        // 1. Update user: package_id, start_date = now(), end_date based on package type
-        await db_1.db
-            .update(schema_1.users)
-            .set({
-            package_id: order.package_id,
-            start_date: startDateStr,
-            end_date: endDateStr,
-        })
-            .where((0, drizzle_orm_1.eq)(schema_1.users.id, order.user_id));
-        // 2. Update order status: approve
-        await db_1.db
-            .update(schema_1.userOrders)
-            .set({
-            status: "approve",
-            reject_reason: null,
-        })
-            .where((0, drizzle_orm_1.eq)(schema_1.userOrders.id, id));
+        const { subscription } = await approveUserOrderRecord(order);
         return (0, response_1.SuccessResponse)(res, {
             message: "Order approved successfully and user subscription activated",
             status: "approve",
-            subscription: {
-                package_id: order.package_id,
-                package_type: pkgRows[0].type,
-                start_date: startDateStr,
-                end_date: endDateStr,
-            },
+            subscription,
         }, 200);
     }
     throw new Errors_1.BadRequest("Invalid status");
@@ -269,6 +270,9 @@ async function deleteUserOrder(req, res) {
     const existing = await db_1.db.select().from(schema_1.userOrders).where((0, drizzle_orm_1.eq)(schema_1.userOrders.id, id)).limit(1);
     if (!existing[0])
         throw new Errors_1.NotFound("Order not found");
+    if (existing[0].receipt) {
+        await (0, handleImages_1.deleteImage)(existing[0].receipt);
+    }
     await db_1.db.delete(schema_1.userOrders).where((0, drizzle_orm_1.eq)(schema_1.userOrders.id, id));
     return (0, response_1.SuccessResponse)(res, { message: "Order deleted successfully" }, 200);
 }
@@ -278,6 +282,11 @@ async function bulkDeleteUserOrders(req, res) {
     const existing = await db_1.db.select().from(schema_1.userOrders).where((0, drizzle_orm_1.inArray)(schema_1.userOrders.id, ids));
     if (existing.length === 0) {
         return (0, response_1.SuccessResponse)(res, { message: "No matching orders found", deletedCount: 0 }, 200);
+    }
+    for (const order of existing) {
+        if (order.receipt) {
+            await (0, handleImages_1.deleteImage)(order.receipt);
+        }
     }
     await db_1.db.delete(schema_1.userOrders).where((0, drizzle_orm_1.inArray)(schema_1.userOrders.id, ids));
     return (0, response_1.SuccessResponse)(res, {

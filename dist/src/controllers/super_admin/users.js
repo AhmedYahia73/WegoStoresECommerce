@@ -35,6 +35,10 @@ async function getAllUsers(req, res) {
         phone: schema_1.users.phone,
         package_id: schema_1.users.package_id,
         package_name: schema_1.packages.name,
+        orders_from: schema_1.users.orders_from,
+        orders_to: schema_1.users.orders_to,
+        orders: schema_1.users.orders,
+        wallet: schema_1.users.wallet,
         start_date: schema_1.users.start_date,
         end_date: schema_1.users.end_date,
         createdAt: schema_1.users.createdAt,
@@ -63,7 +67,7 @@ async function getAllUsers(req, res) {
     const formattedUsers = allUsers.map((user) => ({
         ...user,
         package_name: user.package_name ? (0, localization_1.getLocalizedText)(user.package_name, lang) : null,
-        package_names: user.package_name ?? null,
+        package_names: user.package_name ? (0, localization_1.parseJsonIfNeeded)(user.package_name) : null,
         orders_count: countsMap.get(user.id) || 0,
     }));
     return (0, response_1.SuccessResponse)(res, {
@@ -78,16 +82,20 @@ async function getUsersLists(req, res) {
         .select({
         id: schema_1.packages.id,
         name: schema_1.packages.name,
-        type: schema_1.packages.type,
         price: schema_1.packages.price,
+        orders_from: schema_1.packages.orders_from,
+        orders_to: schema_1.packages.orders_to,
+        sort: schema_1.packages.sort,
     })
         .from(schema_1.packages)
-        .where((0, drizzle_orm_1.eq)(schema_1.packages.status, true));
+        .orderBy((0, drizzle_orm_1.asc)(schema_1.packages.sort));
     const formattedPackages = packagesList.map((pkg) => ({
         id: pkg.id,
         name: (0, localization_1.getLocalizedText)(pkg.name, lang),
-        type: pkg.type,
         price: pkg.price,
+        orders_from: pkg.orders_from,
+        orders_to: pkg.orders_to,
+        sort: pkg.sort,
     }));
     return (0, response_1.SuccessResponse)(res, { packages: formattedPackages }, 200);
 }
@@ -115,6 +123,10 @@ async function getUserById(req, res) {
         phone: schema_1.users.phone,
         package_id: schema_1.users.package_id,
         package_name: schema_1.packages.name,
+        orders_from: schema_1.users.orders_from,
+        orders_to: schema_1.users.orders_to,
+        orders: schema_1.users.orders,
+        wallet: schema_1.users.wallet,
         start_date: schema_1.users.start_date,
         end_date: schema_1.users.end_date,
         createdAt: schema_1.users.createdAt,
@@ -135,14 +147,14 @@ async function getUserById(req, res) {
     const formatted = {
         ...userRow[0],
         package_name: userRow[0].package_name ? (0, localization_1.getLocalizedText)(userRow[0].package_name, lang) : null,
-        package_names: userRow[0].package_name ?? null,
+        package_names: userRow[0].package_name ? (0, localization_1.parseJsonIfNeeded)(userRow[0].package_name) : null,
         orders_count: Number(orderCountRow?.count || 0),
     };
     return (0, response_1.SuccessResponse)(res, { user: formatted }, 200);
 }
 // 5. Create User
 async function createUser(req, res) {
-    const { name, email, subdomain, phone, password, package_id } = req.body;
+    const { name, email, subdomain, phone, password, package_id, wallet } = req.body;
     const existingEmail = await db_1.db
         .select({ id: schema_1.users.id })
         .from(schema_1.users)
@@ -167,9 +179,11 @@ async function createUser(req, res) {
     if (existingPhone[0]) {
         throw new Errors_1.ConflictError("Phone already exists");
     }
-    // Handle subscription if package_id is provided
+    // Handle subscription & orders limits automatically from package_id (default 0 if no package)
     let calculatedStartDate = null;
     let calculatedEndDate = null;
+    let calculatedOrdersFrom = 0;
+    let calculatedOrdersTo = 0;
     if (package_id) {
         const pkg = await db_1.db.select().from(schema_1.packages).where((0, drizzle_orm_1.eq)(schema_1.packages.id, package_id)).limit(1);
         if (!pkg[0]) {
@@ -177,7 +191,9 @@ async function createUser(req, res) {
         }
         const now = new Date();
         calculatedStartDate = now.toISOString().split("T")[0];
-        calculatedEndDate = (0, subscription_1.calculateSubscriptionEndDate)(now, pkg[0].type);
+        calculatedEndDate = (0, subscription_1.calculateSubscriptionEndDate)(now);
+        calculatedOrdersFrom = pkg[0].orders_from;
+        calculatedOrdersTo = pkg[0].orders_to;
     }
     const hashedPassword = await bcrypt_1.default.hash(password, 10);
     // 1. Insert user into central users table
@@ -188,6 +204,9 @@ async function createUser(req, res) {
         phone,
         password: hashedPassword,
         package_id: package_id ?? null,
+        orders_from: calculatedOrdersFrom,
+        orders_to: calculatedOrdersTo,
+        wallet: String(wallet ?? 0),
         start_date: calculatedStartDate,
         end_date: calculatedEndDate,
     });
@@ -196,7 +215,18 @@ async function createUser(req, res) {
         await (0, tenantSchemaService_1.createTenantSchema)(subdomain);
     }
     catch (schemaError) {
-        await db_1.db.delete(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.subdomain, subdomain));
+        try {
+            await db_1.db.delete(schema_1.users).where((0, drizzle_orm_1.eq)(schema_1.users.subdomain, subdomain));
+        }
+        catch (cleanupUserErr) {
+            console.error(`Rollback: Failed to delete user "${subdomain}":`, cleanupUserErr);
+        }
+        try {
+            await (0, tenantSchemaService_1.deleteTenantSchema)(subdomain);
+        }
+        catch (cleanupSchemaErr) {
+            console.error(`Rollback: Failed to drop schema "${subdomain}":`, cleanupSchemaErr);
+        }
         throw schemaError;
     }
     return (0, response_1.SuccessResponse)(res, { message: "User and tenant schema created successfully" }, 201);
@@ -204,7 +234,7 @@ async function createUser(req, res) {
 // 6. Update User
 async function updateUser(req, res) {
     const { id } = req.params;
-    const { name, email, subdomain, phone, password, package_id } = req.body;
+    const { name, email, subdomain, phone, password, package_id, wallet } = req.body;
     const existingUser = await db_1.db
         .select()
         .from(schema_1.users)
@@ -257,10 +287,16 @@ async function updateUser(req, res) {
     if (password !== undefined) {
         updateData.password = await bcrypt_1.default.hash(password, 10);
     }
+    if (wallet !== undefined) {
+        updateData.wallet = String(wallet);
+    }
     // Handle package change
     if (package_id !== undefined) {
         if (package_id === null || package_id === "") {
             updateData.package_id = null;
+            updateData.orders_from = 0;
+            updateData.orders_to = 0;
+            updateData.upgrade_notified = false;
             updateData.start_date = null;
             updateData.end_date = null;
         }
@@ -271,8 +307,11 @@ async function updateUser(req, res) {
             }
             const now = new Date();
             updateData.package_id = pkg[0].id;
+            updateData.orders_from = pkg[0].orders_from;
+            updateData.orders_to = pkg[0].orders_to;
+            updateData.upgrade_notified = false;
             updateData.start_date = now.toISOString().split("T")[0];
-            updateData.end_date = (0, subscription_1.calculateSubscriptionEndDate)(now, pkg[0].type);
+            updateData.end_date = (0, subscription_1.calculateSubscriptionEndDate)(now);
         }
     }
     // If subdomain changed, rename the MySQL database / schema

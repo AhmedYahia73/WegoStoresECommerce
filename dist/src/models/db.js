@@ -48,6 +48,20 @@ const pool = promise_1.default.createPool({
     database: process.env.DB_NAME,
     waitForConnections: true,
     connectionLimit: 10,
+    typeCast: function (field, next) {
+        if (field.type === "JSON") {
+            const val = field.string();
+            if (val === null)
+                return null;
+            try {
+                return JSON.parse(val);
+            }
+            catch {
+                return val;
+            }
+        }
+        return next();
+    },
     queueLimit: 0,
 });
 exports.pool = pool;
