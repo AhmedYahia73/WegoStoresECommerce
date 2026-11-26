@@ -3,7 +3,7 @@ import { db } from "../../models/db";
 import { users, packages, orders } from "../../models/schema";
 import { eq, and, ne, inArray, sql } from "drizzle-orm";
 import bcrypt from "bcrypt";
-import { ConflictError, NotFound, BadRequest } from "../../Errors";
+import { ConflictError, NotFound } from "../../Errors";
 import { SuccessResponse } from "../../utils/response";
 import { getPaginationParams, buildPaginationMeta } from "../../utils/pagination";
 import { getLocalizedText, parseJsonIfNeeded } from "../../utils/localization";
@@ -33,6 +33,7 @@ export async function getAllUsers(req: Request, res: Response) {
       package_name: packages.name,
       orders_from: users.orders_from,
       orders_to: users.orders_to,
+      orders: users.orders,
       wallet: users.wallet,
       start_date: users.start_date,
       end_date: users.end_date,
@@ -134,6 +135,7 @@ export async function getUserById(req: Request, res: Response) {
       package_name: packages.name,
       orders_from: users.orders_from,
       orders_to: users.orders_to,
+      orders: users.orders,
       wallet: users.wallet,
       start_date: users.start_date,
       end_date: users.end_date,
@@ -167,7 +169,7 @@ export async function getUserById(req: Request, res: Response) {
 
 // 5. Create User
 export async function createUser(req: Request, res: Response) {
-  const { name, email, subdomain, phone, password, package_id, orders_from, orders_to, wallet } = req.body;
+  const { name, email, subdomain, phone, password, package_id, wallet } = req.body;
 
   const existingEmail = await db
     .select({ id: users.id })
@@ -196,11 +198,11 @@ export async function createUser(req: Request, res: Response) {
     throw new ConflictError("Phone already exists");
   }
 
-  // Handle subscription & orders limits if package_id is provided
+  // Handle subscription & orders limits automatically from package_id (default 0 if no package)
   let calculatedStartDate: string | null = null;
   let calculatedEndDate: string | null = null;
-  let calculatedOrdersFrom = orders_from ?? 0;
-  let calculatedOrdersTo: number | null = orders_to !== undefined ? orders_to : 0;
+  let calculatedOrdersFrom = 0;
+  let calculatedOrdersTo: number | null = 0;
 
   if (package_id) {
     const pkg = await db.select().from(packages).where(eq(packages.id, package_id)).limit(1);
@@ -254,7 +256,7 @@ export async function createUser(req: Request, res: Response) {
 // 6. Update User
 export async function updateUser(req: Request, res: Response) {
   const { id } = req.params;
-  const { name, email, subdomain, phone, password, package_id, orders_from, orders_to, wallet } = req.body;
+  const { name, email, subdomain, phone, password, package_id, wallet } = req.body;
 
   const existingUser = await db
     .select()
@@ -337,14 +339,6 @@ export async function updateUser(req: Request, res: Response) {
       updateData.start_date = now.toISOString().split("T")[0];
       updateData.end_date = calculateSubscriptionEndDate(now);
     }
-  } else if (orders_from !== undefined || orders_to !== undefined) {
-    const nextOrdersFrom = orders_from !== undefined ? orders_from : existingUser[0].orders_from;
-    const nextOrdersTo = orders_to !== undefined ? orders_to : existingUser[0].orders_to;
-    if (nextOrdersTo !== null && nextOrdersTo < nextOrdersFrom) {
-      throw new BadRequest("orders_to must be greater than or equal to orders_from");
-    }
-    if (orders_from !== undefined) updateData.orders_from = orders_from;
-    if (orders_to !== undefined) updateData.orders_to = orders_to;
   }
 
   // If subdomain changed, rename the MySQL database / schema

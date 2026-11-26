@@ -558,6 +558,7 @@
           "package_names": { "ar": "الباقة الذهبية VIP", "en": "VIP Enterprise Package" },
           "orders_from": 501,
           "orders_to": null,
+          "orders": 0,
           "wallet": "0.00",
           "start_date": "2026-01-01",
           "end_date": "2027-01-01",
@@ -629,6 +630,7 @@
         "package_names": { "ar": "الباقة الذهبية VIP", "en": "VIP Enterprise Package" },
         "orders_from": 501,
         "orders_to": null,
+        "orders": 0,
         "wallet": "0.00",
         "start_date": "2026-01-01",
         "end_date": "2027-01-01",
@@ -642,7 +644,7 @@
 - **Errors:** `400`, `404` (`"User not found"`).
 
 ### 8.5 `POST /api/super_admin/users`
-- **الشرح:** إنشاء مستخدم (تاجر) جديد وإنشاء الـ tenant schema الخاصة به تلقائياً.
+- **الشرح:** إنشاء مستخدم (تاجر) جديد وإنشاء الـ tenant schema الخاصة به تلقائياً. *(حقول `orders_from`, `orders_to`, `orders` تُدار تلقائياً من الباقة والقيم الافتراضية ولا تُمرر في الـ Body.)*
 - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
 - **Body:**
   ```json
@@ -653,8 +655,6 @@
     "phone": "01012345678",
     "password": "password123",
     "package_id": "uuid",
-    "orders_from": 0,
-    "orders_to": 0,
     "wallet": 0
   }
   ```
@@ -664,8 +664,6 @@
   - `phone` (`string`, min 1, unique, required)
   - `password` (`string`, min 6, required)
   - `package_id` (`uuid | null`, optional — عند تمريرها تُنسخ `orders_from`/`orders_to` من الباقة وتُحسب `start_date`/`end_date`)
-  - `orders_from` (`int >= 0`, optional, default `0`)
-  - `orders_to` (`int >= 0 | null`, optional, default `0`)
   - `wallet` (`number >= 0` أو decimal string, optional, default `0`)
 - **Response (`201`):**
   ```json
@@ -677,10 +675,10 @@
 - **Errors:** `400`, `404` (`"Selected package not found"`), `409` (`Email`/`Subdomain`/`Phone` already exists).
 
 ### 8.6 `PUT /api/super_admin/users/:id`
-- **الشرح:** تعديل بيانات مستخدم (وعند تغيير `subdomain` يعيد تسمية الـ schema، وعند تمرير `package_id` يحدّث `orders_from`/`orders_to`/`start_date`/`end_date`، وعند تمرير `package_id: null` يصفرها).
+- **الشرح:** تعديل بيانات مستخدم (وعند تغيير `subdomain` يعيد تسمية الـ schema، وعند تمرير `package_id` يحدّث `orders_from`/`orders_to`/`start_date`/`end_date`، وعند تمرير `package_id: null` يصفرها. حقول `orders_from`, `orders_to`, `orders` تلقائية ولا تُمرر في الـ Body).
 - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
 - **Path Params:** `id` (`uuid`, required)
-- **Body (all optional):** `name`, `email`, `subdomain`, `phone`, `password`, `package_id` (`uuid | null`), `orders_from`, `orders_to` (`int | null`), `wallet`
+- **Body (all optional):** `name`, `email`, `subdomain`, `phone`, `password`, `package_id` (`uuid | null`), `wallet`
 - **Response (`200`):**
   ```json
   {

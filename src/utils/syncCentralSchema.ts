@@ -68,6 +68,11 @@ export async function syncCentralSchema(connection: Connection, dbName: string):
         "ALTER TABLE `users` MODIFY COLUMN `orders_to` INT DEFAULT 0;"
       );
     }
+    if (!userCols.has("orders")) {
+      await connection.query(
+        "ALTER TABLE `users` ADD COLUMN `orders` INT NOT NULL DEFAULT 0;"
+      );
+    }
     if (!userCols.has("wallet")) {
       await connection.query(
         "ALTER TABLE `users` ADD COLUMN `wallet` DECIMAL(10, 2) NOT NULL DEFAULT 0.00;"

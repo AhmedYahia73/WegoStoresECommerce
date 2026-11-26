@@ -19,6 +19,7 @@ export const users = mysqlTable("users", {
   }),
   orders_from: int("orders_from").notNull().default(0),
   orders_to: int("orders_to").default(0),
+  orders: int("orders").notNull().default(0),
   wallet: decimal("wallet", { precision: 10, scale: 2 }).notNull().default("0.00"),
   start_date: date("start_date", { mode: "string" }),
   end_date: date("end_date", { mode: "string" }),

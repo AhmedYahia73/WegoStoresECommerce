@@ -81,6 +81,7 @@ async function createDatabaseAndTables() {
       \`package_id\` CHAR(36),
       \`orders_from\` INT NOT NULL DEFAULT 0,
       \`orders_to\` INT DEFAULT 0,
+      \`orders\` INT NOT NULL DEFAULT 0,
       \`wallet\` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
       \`start_date\` DATE,
       \`end_date\` DATE,
