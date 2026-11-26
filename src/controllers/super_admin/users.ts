@@ -3,7 +3,7 @@ import { db } from "../../models/db";
 import { users, packages, orders } from "../../models/schema";
 import { eq, and, ne, inArray, sql } from "drizzle-orm";
 import bcrypt from "bcrypt";
-import { ConflictError, NotFound } from "../../Errors";
+import { ConflictError, NotFound, BadRequest } from "../../Errors";
 import { SuccessResponse } from "../../utils/response";
 import { getPaginationParams, buildPaginationMeta } from "../../utils/pagination";
 import { getLocalizedText } from "../../utils/localization";
@@ -31,6 +31,9 @@ export async function getAllUsers(req: Request, res: Response) {
       phone: users.phone,
       package_id: users.package_id,
       package_name: packages.name,
+      orders_from: users.orders_from,
+      orders_to: users.orders_to,
+      wallet: users.wallet,
       start_date: users.start_date,
       end_date: users.end_date,
       createdAt: users.createdAt,
@@ -63,7 +66,6 @@ export async function getAllUsers(req: Request, res: Response) {
   const formattedUsers = allUsers.map((user) => ({
     ...user,
     package_name: user.package_name ? getLocalizedText(user.package_name, lang) : null,
-    package_names: user.package_name ?? null,
     orders_count: countsMap.get(user.id) || 0,
   }));
 
@@ -85,17 +87,18 @@ export async function getUsersLists(req: Request, res: Response) {
     .select({
       id: packages.id,
       name: packages.name,
-      type: packages.type,
       price: packages.price,
+      orders_from: packages.orders_from,
+      orders_to: packages.orders_to,
     })
-    .from(packages)
-    .where(eq(packages.status, true));
+    .from(packages);
 
   const formattedPackages = packagesList.map((pkg) => ({
     id: pkg.id,
     name: getLocalizedText(pkg.name, lang),
-    type: pkg.type,
     price: pkg.price,
+    orders_from: pkg.orders_from,
+    orders_to: pkg.orders_to,
   }));
 
   return SuccessResponse(res, { packages: formattedPackages }, 200);
@@ -128,6 +131,9 @@ export async function getUserById(req: Request, res: Response) {
       phone: users.phone,
       package_id: users.package_id,
       package_name: packages.name,
+      orders_from: users.orders_from,
+      orders_to: users.orders_to,
+      wallet: users.wallet,
       start_date: users.start_date,
       end_date: users.end_date,
       createdAt: users.createdAt,
@@ -151,7 +157,6 @@ export async function getUserById(req: Request, res: Response) {
   const formatted = {
     ...userRow[0],
     package_name: userRow[0].package_name ? getLocalizedText(userRow[0].package_name, lang) : null,
-    package_names: userRow[0].package_name ?? null,
     orders_count: Number(orderCountRow?.count || 0),
   };
 
@@ -160,7 +165,7 @@ export async function getUserById(req: Request, res: Response) {
 
 // 5. Create User
 export async function createUser(req: Request, res: Response) {
-  const { name, email, subdomain, phone, password, package_id } = req.body;
+  const { name, email, subdomain, phone, password, package_id, orders_from, orders_to, wallet } = req.body;
 
   const existingEmail = await db
     .select({ id: users.id })
@@ -189,9 +194,11 @@ export async function createUser(req: Request, res: Response) {
     throw new ConflictError("Phone already exists");
   }
 
-  // Handle subscription if package_id is provided
+  // Handle subscription & orders limits if package_id is provided
   let calculatedStartDate: string | null = null;
   let calculatedEndDate: string | null = null;
+  let calculatedOrdersFrom = orders_from ?? 0;
+  let calculatedOrdersTo: number | null = orders_to !== undefined ? orders_to : 0;
 
   if (package_id) {
     const pkg = await db.select().from(packages).where(eq(packages.id, package_id)).limit(1);
@@ -200,7 +207,9 @@ export async function createUser(req: Request, res: Response) {
     }
     const now = new Date();
     calculatedStartDate = now.toISOString().split("T")[0];
-    calculatedEndDate = calculateSubscriptionEndDate(now, pkg[0].type);
+    calculatedEndDate = calculateSubscriptionEndDate(now);
+    calculatedOrdersFrom = pkg[0].orders_from;
+    calculatedOrdersTo = pkg[0].orders_to;
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -213,6 +222,9 @@ export async function createUser(req: Request, res: Response) {
     phone,
     password: hashedPassword,
     package_id: package_id ?? null,
+    orders_from: calculatedOrdersFrom,
+    orders_to: calculatedOrdersTo,
+    wallet: String(wallet ?? 0),
     start_date: calculatedStartDate,
     end_date: calculatedEndDate,
   });
@@ -231,7 +243,7 @@ export async function createUser(req: Request, res: Response) {
 // 6. Update User
 export async function updateUser(req: Request, res: Response) {
   const { id } = req.params;
-  const { name, email, subdomain, phone, password, package_id } = req.body;
+  const { name, email, subdomain, phone, password, package_id, orders_from, orders_to, wallet } = req.body;
 
   const existingUser = await db
     .select()
@@ -290,11 +302,16 @@ export async function updateUser(req: Request, res: Response) {
   if (password !== undefined) {
     updateData.password = await bcrypt.hash(password, 10);
   }
+  if (wallet !== undefined) {
+    updateData.wallet = String(wallet);
+  }
 
   // Handle package change
   if (package_id !== undefined) {
     if (package_id === null || package_id === "") {
       updateData.package_id = null;
+      updateData.orders_from = 0;
+      updateData.orders_to = 0;
       updateData.start_date = null;
       updateData.end_date = null;
     } else {
@@ -304,9 +321,19 @@ export async function updateUser(req: Request, res: Response) {
       }
       const now = new Date();
       updateData.package_id = pkg[0].id;
+      updateData.orders_from = pkg[0].orders_from;
+      updateData.orders_to = pkg[0].orders_to;
       updateData.start_date = now.toISOString().split("T")[0];
-      updateData.end_date = calculateSubscriptionEndDate(now, pkg[0].type);
+      updateData.end_date = calculateSubscriptionEndDate(now);
     }
+  } else if (orders_from !== undefined || orders_to !== undefined) {
+    const nextOrdersFrom = orders_from !== undefined ? orders_from : existingUser[0].orders_from;
+    const nextOrdersTo = orders_to !== undefined ? orders_to : existingUser[0].orders_to;
+    if (nextOrdersTo !== null && nextOrdersTo < nextOrdersFrom) {
+      throw new BadRequest("orders_to must be greater than or equal to orders_from");
+    }
+    if (orders_from !== undefined) updateData.orders_from = orders_from;
+    if (orders_to !== undefined) updateData.orders_to = orders_to;
   }
 
   // If subdomain changed, rename the MySQL database / schema

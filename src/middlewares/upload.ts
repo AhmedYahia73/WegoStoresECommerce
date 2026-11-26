@@ -32,9 +32,29 @@ const fileFilter = (
   }
 };
 
+const documentOrImageFilter = (
+  _req: any,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+) => {
+  if (file.mimetype.startsWith("image/") || file.mimetype === "application/pdf") {
+    cb(null, true);
+  } else {
+    cb(new BadRequest("Only image or PDF files are allowed"));
+  }
+};
+
 export const upload = multer({
   storage,
   fileFilter,
+  limits: {
+    fileSize: 15 * 1024 * 1024, // 15MB limit
+  },
+});
+
+export const uploadDocumentOrImage = multer({
+  storage,
+  fileFilter: documentOrImageFilter,
   limits: {
     fileSize: 15 * 1024 * 1024, // 15MB limit
   },
@@ -79,10 +99,10 @@ export function getFileUrl(req: Request, file: Express.Multer.File): string {
 }
 
 /**
- * Middleware for single image upload via multipart/form-data.
+ * Shared single-file upload wrapper for multipart/form-data.
  */
-export function uploadSingleImage(fieldName: string = "image") {
-  const multerMiddleware = upload.single(fieldName);
+function wrapSingleUpload(multerInstance: multer.Multer, fieldName: string) {
+  const multerMiddleware = multerInstance.single(fieldName);
   return (req: Request, res: Response, next: NextFunction) => {
     multerMiddleware(req, res, (err: any) => {
       if (err) return next(err);
@@ -94,6 +114,20 @@ export function uploadSingleImage(fieldName: string = "image") {
       });
     });
   };
+}
+
+/**
+ * Middleware for single image upload via multipart/form-data.
+ */
+export function uploadSingleImage(fieldName: string = "image") {
+  return wrapSingleUpload(upload, fieldName);
+}
+
+/**
+ * Middleware for single file upload (image or PDF) via multipart/form-data.
+ */
+export function uploadSingleFile(fieldName: string = "file") {
+  return wrapSingleUpload(uploadDocumentOrImage, fieldName);
 }
 
 /**

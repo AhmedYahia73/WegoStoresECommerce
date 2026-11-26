@@ -1,12 +1,13 @@
 import { Request, Response } from "express";
 import { db } from "../../models/db";
-import { userOrders, users, packages, discounts } from "../../models/schema";
+import { userOrders, users, packages } from "../../models/schema";
 import { eq, and, gte, lte, inArray, sql, SQL } from "drizzle-orm";
 import { NotFound, BadRequest } from "../../Errors";
 import { SuccessResponse } from "../../utils/response";
 import { getLocalizedText } from "../../utils/localization";
 import { calculateSubscriptionEndDate } from "../../utils/subscription";
 import { getPaginationParams, buildPaginationMeta } from "../../utils/pagination";
+import { uploadImage, deleteImage } from "../../utils/handleImages";
 
 // 1. Get All User Orders (Paginated with filters: user_id, package_id, status, from, to date range)
 export async function getAllUserOrders(req: Request, res: Response) {
@@ -46,24 +47,20 @@ export async function getAllUserOrders(req: Request, res: Response) {
     .select({
       id: userOrders.id,
       price: userOrders.price,
-      discount: userOrders.discount,
-      final_price: userOrders.final_price,
       user_id: userOrders.user_id,
       user_name: users.name,
       user_phone: users.phone,
       package_id: userOrders.package_id,
       package_name: packages.name,
-      discount_id: userOrders.discount_id,
-      discount_name: discounts.name,
       status: userOrders.status,
       reject_reason: userOrders.reject_reason,
+      receipt: userOrders.receipt,
       createdAt: userOrders.createdAt,
       updatedAt: userOrders.updatedAt,
     })
     .from(userOrders)
     .leftJoin(users, eq(userOrders.user_id, users.id))
     .leftJoin(packages, eq(userOrders.package_id, packages.id))
-    .leftJoin(discounts, eq(userOrders.discount_id, discounts.id))
     .where(whereClause)
     .limit(limit)
     .offset(offset);
@@ -71,17 +68,14 @@ export async function getAllUserOrders(req: Request, res: Response) {
   const formatted = list.map((item) => ({
     id: item.id,
     price: item.price,
-    discount: item.discount,
-    final_price: item.final_price,
     user_id: item.user_id,
     user_name: item.user_name,
     user_phone: item.user_phone,
     package_id: item.package_id,
     package_name: item.package_name ? getLocalizedText(item.package_name, lang) : null,
-    discount_id: item.discount_id,
-    discount_name: item.discount_name ? getLocalizedText(item.discount_name, lang) : null,
     status: item.status,
     reject_reason: item.reject_reason,
+    receipt: item.receipt,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
   }));
@@ -112,33 +106,18 @@ export async function getUserOrdersLists(req: Request, res: Response) {
     .select({
       id: packages.id,
       name: packages.name,
-      type: packages.type,
       price: packages.price,
+      orders_from: packages.orders_from,
+      orders_to: packages.orders_to,
     })
-    .from(packages)
-    .where(eq(packages.status, true));
+    .from(packages);
 
   const formattedPackages = packagesList.map((pkg) => ({
     id: pkg.id,
     name: getLocalizedText(pkg.name, lang),
-    type: pkg.type,
     price: pkg.price,
-  }));
-
-  const discountsList = await db
-    .select({
-      id: discounts.id,
-      name: discounts.name,
-      amount: discounts.amount,
-      type: discounts.type,
-    })
-    .from(discounts);
-
-  const formattedDiscounts = discountsList.map((d) => ({
-    id: d.id,
-    name: getLocalizedText(d.name, lang),
-    amount: d.amount,
-    type: d.type,
+    orders_from: pkg.orders_from,
+    orders_to: pkg.orders_to,
   }));
 
   return SuccessResponse(
@@ -146,7 +125,6 @@ export async function getUserOrdersLists(req: Request, res: Response) {
     {
       users: usersList,
       packages: formattedPackages,
-      discounts: formattedDiscounts,
     },
     200
   );
@@ -161,24 +139,20 @@ export async function getUserOrderById(req: Request, res: Response) {
     .select({
       id: userOrders.id,
       price: userOrders.price,
-      discount: userOrders.discount,
-      final_price: userOrders.final_price,
       user_id: userOrders.user_id,
       user_name: users.name,
       user_phone: users.phone,
       package_id: userOrders.package_id,
       package_name: packages.name,
-      discount_id: userOrders.discount_id,
-      discount_name: discounts.name,
       status: userOrders.status,
       reject_reason: userOrders.reject_reason,
+      receipt: userOrders.receipt,
       createdAt: userOrders.createdAt,
       updatedAt: userOrders.updatedAt,
     })
     .from(userOrders)
     .leftJoin(users, eq(userOrders.user_id, users.id))
     .leftJoin(packages, eq(userOrders.package_id, packages.id))
-    .leftJoin(discounts, eq(userOrders.discount_id, discounts.id))
     .where(eq(userOrders.id, id))
     .limit(1);
 
@@ -187,7 +161,6 @@ export async function getUserOrderById(req: Request, res: Response) {
   const formatted = {
     ...row[0],
     package_name: row[0].package_name ? getLocalizedText(row[0].package_name, lang) : null,
-    discount_name: row[0].discount_name ? getLocalizedText(row[0].discount_name, lang) : null,
   };
 
   return SuccessResponse(res, { user_order: formatted }, 200);
@@ -195,7 +168,7 @@ export async function getUserOrderById(req: Request, res: Response) {
 
 // 4. Create User Order
 export async function createUserOrder(req: Request, res: Response) {
-  const { package_id, discount_id, price, discount, final_price, user_id } = req.body;
+  const { package_id, price, user_id, receipt } = req.body;
 
   // Verify user exists
   const user = await db.select({ id: users.id }).from(users).where(eq(users.id, user_id)).limit(1);
@@ -205,14 +178,14 @@ export async function createUserOrder(req: Request, res: Response) {
   const pkg = await db.select({ id: packages.id }).from(packages).where(eq(packages.id, package_id)).limit(1);
   if (!pkg[0]) throw new NotFound("Package not found");
 
+  const receiptUrl = receipt ? await uploadImage(req, receipt, "user_orders") : null;
+
   await db.insert(userOrders).values({
     package_id,
-    discount_id: discount_id ?? null,
     price: String(price),
-    discount: String(discount ?? 0),
-    final_price: String(final_price),
     user_id,
     status: "pending",
+    receipt: receiptUrl || null,
   });
 
   return SuccessResponse(res, { message: "User order created successfully" }, 201);
@@ -267,13 +240,15 @@ export async function changeUserOrderStatus(req: Request, res: Response) {
 
     const now = new Date();
     const startDateStr = now.toISOString().split("T")[0];
-    const endDateStr = calculateSubscriptionEndDate(now, pkgRows[0].type);
+    const endDateStr = calculateSubscriptionEndDate(now);
 
-    // 1. Update user: package_id, start_date = now(), end_date based on package type
+    // 1. Update user: package_id, orders_from/to from package, start_date = now(), end_date = +1 month
     await db
       .update(users)
       .set({
         package_id: order.package_id,
+        orders_from: pkgRows[0].orders_from,
+        orders_to: pkgRows[0].orders_to,
         start_date: startDateStr,
         end_date: endDateStr,
       })
@@ -295,7 +270,8 @@ export async function changeUserOrderStatus(req: Request, res: Response) {
         status: "approve",
         subscription: {
           package_id: order.package_id,
-          package_type: pkgRows[0].type,
+          orders_from: pkgRows[0].orders_from,
+          orders_to: pkgRows[0].orders_to,
           start_date: startDateStr,
           end_date: endDateStr,
         },
@@ -314,6 +290,10 @@ export async function deleteUserOrder(req: Request, res: Response) {
   const existing = await db.select().from(userOrders).where(eq(userOrders.id, id)).limit(1);
   if (!existing[0]) throw new NotFound("Order not found");
 
+  if (existing[0].receipt) {
+    await deleteImage(existing[0].receipt);
+  }
+
   await db.delete(userOrders).where(eq(userOrders.id, id));
 
   return SuccessResponse(res, { message: "Order deleted successfully" }, 200);
@@ -326,6 +306,12 @@ export async function bulkDeleteUserOrders(req: Request, res: Response) {
   const existing = await db.select().from(userOrders).where(inArray(userOrders.id, ids));
   if (existing.length === 0) {
     return SuccessResponse(res, { message: "No matching orders found", deletedCount: 0 }, 200);
+  }
+
+  for (const order of existing) {
+    if (order.receipt) {
+      await deleteImage(order.receipt);
+    }
   }
 
   await db.delete(userOrders).where(inArray(userOrders.id, ids));

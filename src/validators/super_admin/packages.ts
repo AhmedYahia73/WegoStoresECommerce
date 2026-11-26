@@ -7,29 +7,60 @@ const multilingualNameSchema = z
     { message: "At least one language is required for name" }
   );
 
+const nullableOrdersLimitSchema = z
+  .union([
+    z.number().int("Must be an integer").min(0, "Must be >= 0"),
+    z.string().regex(/^\d+$/, "Must be a non-negative integer").transform(Number),
+  ])
+  .nullable();
+
 export const createPackageSchema = z.object({
-  body: z.object({
-    name: multilingualNameSchema,
-    type: z.enum(["monthly", "quarterly", "biannual", "annual"], {
-      required_error: "Package type is required (monthly, quarterly, biannual, annual)",
-    }),
-    price: z.union([z.number(), z.string().regex(/^\d+(\.\d{1,2})?$/)], {
-      required_error: "Price is required",
-    }),
-    status: z.boolean().optional().default(true),
-  }),
+  body: z
+    .object({
+      name: multilingualNameSchema,
+      price: z.union([z.number().nonnegative(), z.string().regex(/^\d+(\.\d{1,2})?$/)], {
+        required_error: "Price is required",
+      }),
+      orders_from: z.coerce
+        .number({ required_error: "orders_from is required" })
+        .int("orders_from must be an integer")
+        .min(0, "orders_from must be >= 0"),
+      orders_to: nullableOrdersLimitSchema.optional().default(null),
+    })
+    .refine(
+      (data) => data.orders_to === null || data.orders_to === undefined || data.orders_to >= data.orders_from,
+      {
+        message: "orders_to must be greater than or equal to orders_from",
+        path: ["orders_to"],
+      }
+    ),
 });
 
 export const updatePackageSchema = z.object({
   params: z.object({
     id: z.string({ required_error: "Package ID is required" }).uuid("Invalid package ID"),
   }),
-  body: z.object({
-    name: multilingualNameSchema.optional(),
-    type: z.enum(["monthly", "quarterly", "biannual", "annual"]).optional(),
-    price: z.union([z.number(), z.string().regex(/^\d+(\.\d{1,2})?$/)]).optional(),
-    status: z.boolean().optional(),
-  }),
+  body: z
+    .object({
+      name: multilingualNameSchema.optional(),
+      price: z.union([z.number().nonnegative(), z.string().regex(/^\d+(\.\d{1,2})?$/)]).optional(),
+      orders_from: z.coerce
+        .number()
+        .int("orders_from must be an integer")
+        .min(0, "orders_from must be >= 0")
+        .optional(),
+      orders_to: nullableOrdersLimitSchema.optional(),
+    })
+    .refine(
+      (data) =>
+        data.orders_from !== undefined && data.orders_to !== undefined && data.orders_to !== null
+          ? data.orders_to >= data.orders_from
+          : true,
+      {
+        message: "orders_to must be greater than or equal to orders_from",
+        path: ["orders_to"],
+      }
+    ),
 });
 
 export const packageIdParamSchema = z.object({

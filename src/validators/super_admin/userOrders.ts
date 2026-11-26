@@ -3,18 +3,11 @@ import z from "zod";
 export const createUserOrderSchema = z.object({
   body: z.object({
     package_id: z.string({ required_error: "Package ID is required" }).uuid("Invalid package ID"),
-    discount_id: z.string().uuid("Invalid discount ID").optional().nullable(),
     price: z.union([z.number(), z.string().regex(/^\d+(\.\d{1,2})?$/)], {
       required_error: "Price is required",
     }),
-    discount: z
-      .union([z.number(), z.string().regex(/^\d+(\.\d{1,2})?$/)])
-      .optional()
-      .default(0),
-    final_price: z.union([z.number(), z.string().regex(/^\d+(\.\d{1,2})?$/)], {
-      required_error: "Final price is required",
-    }),
     user_id: z.string({ required_error: "User ID is required" }).uuid("Invalid user ID"),
+    receipt: z.string().min(1, "Receipt cannot be empty").optional().nullable(),
   }),
 });
 

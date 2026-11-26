@@ -20,8 +20,7 @@ import { bulkDeleteSchema } from "../../validators/super_admin/common";
 
 const router = Router();
 
-// Bulk delete operations (MUST precede /:id)
-router.post("/bulk-delete", checkOnlyAdmin(), validate(bulkDeleteSchema), catchAsync(bulkDeletePackages));
+// Bulk delete operation (MUST precede /:id)
 router.delete("/bulk", checkOnlyAdmin(), validate(bulkDeleteSchema), catchAsync(bulkDeletePackages));
 
 // Query operations

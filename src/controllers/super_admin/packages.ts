@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { db } from "../../models/db";
 import { packages } from "../../models/schema";
 import { eq, inArray, sql } from "drizzle-orm";
-import { NotFound } from "../../Errors";
+import { BadRequest, NotFound } from "../../Errors";
 import { SuccessResponse } from "../../utils/response";
 import { getLocalizedText } from "../../utils/localization";
 import { getPaginationParams, buildPaginationMeta } from "../../utils/pagination";
@@ -21,9 +21,9 @@ export async function getAllPackages(req: Request, res: Response) {
     id: item.id,
     name: getLocalizedText(item.name, lang),
     names: item.name,
-    type: item.type,
     price: item.price,
-    status: item.status,
+    orders_from: item.orders_from,
+    orders_to: item.orders_to,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
   }));
@@ -46,17 +46,18 @@ export async function getPackagesSelection(req: Request, res: Response) {
     .select({
       id: packages.id,
       name: packages.name,
-      type: packages.type,
       price: packages.price,
+      orders_from: packages.orders_from,
+      orders_to: packages.orders_to,
     })
-    .from(packages)
-    .where(eq(packages.status, true));
+    .from(packages);
 
   const formatted = list.map((item) => ({
     id: item.id,
     name: getLocalizedText(item.name, lang),
-    type: item.type,
     price: item.price,
+    orders_from: item.orders_from,
+    orders_to: item.orders_to,
   }));
 
   return SuccessResponse(res, { packages: formatted }, 200);
@@ -74,9 +75,9 @@ export async function getPackageById(req: Request, res: Response) {
     id: row[0].id,
     name: getLocalizedText(row[0].name, lang),
     names: row[0].name,
-    type: row[0].type,
     price: row[0].price,
-    status: row[0].status,
+    orders_from: row[0].orders_from,
+    orders_to: row[0].orders_to,
     createdAt: row[0].createdAt,
     updatedAt: row[0].updatedAt,
   };
@@ -86,13 +87,13 @@ export async function getPackageById(req: Request, res: Response) {
 
 // 4. Create Package
 export async function createPackage(req: Request, res: Response) {
-  const { name, type, price, status } = req.body;
+  const { name, price, orders_from, orders_to } = req.body;
 
   await db.insert(packages).values({
     name,
-    type,
     price: String(price),
-    status: status ?? true,
+    orders_from,
+    orders_to: orders_to ?? null,
   });
 
   return SuccessResponse(res, { message: "Package created successfully" }, 201);
@@ -101,16 +102,22 @@ export async function createPackage(req: Request, res: Response) {
 // 5. Update Package
 export async function updatePackage(req: Request, res: Response) {
   const { id } = req.params;
-  const { name, type, price, status } = req.body;
+  const { name, price, orders_from, orders_to } = req.body;
 
   const existing = await db.select().from(packages).where(eq(packages.id, id)).limit(1);
   if (!existing[0]) throw new NotFound("Package not found");
 
+  const nextOrdersFrom = orders_from !== undefined ? orders_from : existing[0].orders_from;
+  const nextOrdersTo = orders_to !== undefined ? orders_to : existing[0].orders_to;
+  if (nextOrdersTo !== null && nextOrdersTo < nextOrdersFrom) {
+    throw new BadRequest("orders_to must be greater than or equal to orders_from");
+  }
+
   const updateData: Partial<typeof packages.$inferInsert> = {};
   if (name !== undefined) updateData.name = name;
-  if (type !== undefined) updateData.type = type;
   if (price !== undefined) updateData.price = String(price);
-  if (status !== undefined) updateData.status = status;
+  if (orders_from !== undefined) updateData.orders_from = orders_from;
+  if (orders_to !== undefined) updateData.orders_to = orders_to;
 
   if (Object.keys(updateData).length > 0) {
     await db.update(packages).set(updateData).where(eq(packages.id, id));

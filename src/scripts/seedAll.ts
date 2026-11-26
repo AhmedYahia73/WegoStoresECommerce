@@ -73,9 +73,9 @@ async function runSeed() {
       CREATE TABLE IF NOT EXISTS \`packages\` (
         \`id\` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
         \`name\` JSON NOT NULL,
-        \`type\` ENUM('monthly', 'quarterly', 'biannual', 'annual') NOT NULL DEFAULT 'monthly',
         \`price\` DECIMAL(10, 2) NOT NULL,
-        \`status\` BOOLEAN NOT NULL DEFAULT 1,
+        \`orders_from\` INT NOT NULL DEFAULT 0,
+        \`orders_to\` INT NULL,
         \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -89,16 +89,17 @@ async function runSeed() {
     };
 
     await connection.query(`
-      INSERT INTO \`packages\` (\`id\`, \`name\`, \`type\`, \`price\`, \`status\`)
+      INSERT INTO \`packages\` (\`id\`, \`name\`, \`price\`, \`orders_from\`, \`orders_to\`)
       VALUES 
-        (?, ?, 'monthly', 299.00, 1),
-        (?, ?, 'quarterly', 799.00, 1),
-        (?, ?, 'biannual', 1499.00, 1),
-        (?, ?, 'annual', 2499.00, 1)
+        (?, ?, 299.00, 0, 50),
+        (?, ?, 799.00, 51, 200),
+        (?, ?, 1499.00, 201, 500),
+        (?, ?, 2499.00, 501, NULL)
       ON DUPLICATE KEY UPDATE 
         \`name\` = VALUES(\`name\`),
         \`price\` = VALUES(\`price\`),
-        \`status\` = VALUES(\`status\`);
+        \`orders_from\` = VALUES(\`orders_from\`),
+        \`orders_to\` = VALUES(\`orders_to\`);
     `, [
       packageIds.starter, JSON.stringify({ ar: "باقة المبتدئين", en: "Starter Package" }),
       packageIds.pro, JSON.stringify({ ar: "باقة التجار المحترفين", en: "Professional Package" }),
@@ -137,44 +138,7 @@ async function runSeed() {
       `, [name, icon, desc]);
     }
 
-    // 1.4 Central Discounts
-    console.log("   -> Seeding Central Discounts...");
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS \`discounts\` (
-        \`id\` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
-        \`name\` JSON NOT NULL,
-        \`amount\` DECIMAL(10, 2) NOT NULL,
-        \`type\` ENUM('percentage', 'value') NOT NULL DEFAULT 'percentage',
-        \`start_date\` DATE NOT NULL,
-        \`end_date\` DATE NOT NULL,
-        \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-    `);
-
-    const discountIds = {
-      promo20: "20000000-0000-0000-0000-000000000001",
-      bonus150: "20000000-0000-0000-0000-000000000002",
-      summer30: "20000000-0000-0000-0000-000000000003",
-    };
-
-    await connection.query(`
-      INSERT INTO \`discounts\` (\`id\`, \`name\`, \`amount\`, \`type\`, \`start_date\`, \`end_date\`)
-      VALUES 
-        (?, ?, 20.00, 'percentage', '2026-01-01', '2026-12-31'),
-        (?, ?, 150.00, 'value', '2026-01-01', '2026-12-31'),
-        (?, ?, 30.00, 'percentage', '2026-06-01', '2026-09-30')
-      ON DUPLICATE KEY UPDATE 
-        \`name\` = VALUES(\`name\`),
-        \`amount\` = VALUES(\`amount\`),
-        \`type\` = VALUES(\`type\`);
-    `, [
-      discountIds.promo20, JSON.stringify({ ar: "خصم العام الجديد 20%", en: "New Year Promo 20%" }),
-      discountIds.bonus150, JSON.stringify({ ar: "كوبون ترحيبي 150 ج.م", en: "Welcome Bonus 150 EGP" }),
-      discountIds.summer30, JSON.stringify({ ar: "تخفيضات الصيف 30%", en: "Summer Promo 30%" }),
-    ]);
-
-    // 1.5 Central Users (Tenants)
+    // 1.4 Central Users (Tenants)
     console.log("   -> Seeding Central Tenants (Users)...");
     await connection.query(`
       CREATE TABLE IF NOT EXISTS \`users\` (
@@ -185,6 +149,9 @@ async function runSeed() {
         \`phone\` VARCHAR(50) NOT NULL UNIQUE,
         \`password\` VARCHAR(255) NOT NULL,
         \`package_id\` CHAR(36),
+        \`orders_from\` INT NOT NULL DEFAULT 0,
+        \`orders_to\` INT DEFAULT 0,
+        \`wallet\` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
         \`start_date\` DATE,
         \`end_date\` DATE,
         \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -201,33 +168,37 @@ async function runSeed() {
 
     // User 1: Ahmed (Required by user!)
     await connection.query(`
-      INSERT INTO \`users\` (\`id\`, \`name\`, \`email\`, \`subdomain\`, \`phone\`, \`password\`, \`package_id\`, \`start_date\`, \`end_date\`)
-      VALUES (?, 'Ahmed Store', 'ahmed@gmail.com', 'ahmed', '123456789', ?, ?, '2026-01-01', '2027-01-01')
+      INSERT INTO \`users\` (\`id\`, \`name\`, \`email\`, \`subdomain\`, \`phone\`, \`password\`, \`package_id\`, \`orders_from\`, \`orders_to\`, \`start_date\`, \`end_date\`)
+      VALUES (?, 'Ahmed Store', 'ahmed@gmail.com', 'ahmed', '123456789', ?, ?, 501, NULL, '2026-01-01', '2027-01-01')
       ON DUPLICATE KEY UPDATE 
         \`name\` = 'Ahmed Store',
         \`email\` = 'ahmed@gmail.com',
         \`phone\` = '123456789',
         \`password\` = ?,
         \`package_id\` = VALUES(\`package_id\`),
+        \`orders_from\` = VALUES(\`orders_from\`),
+        \`orders_to\` = VALUES(\`orders_to\`),
         \`start_date\` = '2026-01-01',
         \`end_date\` = '2027-01-01';
     `, [userIds.ahmed, defaultHashedPassword, packageIds.vip, defaultHashedPassword]);
 
     // Additional mock tenants
     await connection.query(`
-      INSERT INTO \`users\` (\`id\`, \`name\`, \`email\`, \`subdomain\`, \`phone\`, \`password\`, \`package_id\`, \`start_date\`, \`end_date\`)
+      INSERT INTO \`users\` (\`id\`, \`name\`, \`email\`, \`subdomain\`, \`phone\`, \`password\`, \`package_id\`, \`orders_from\`, \`orders_to\`, \`start_date\`, \`end_date\`)
       VALUES 
-        (?, 'سارة بوتيك للأزياء', 'sara@boutique.com', 'sara', '+201098765432', ?, ?, '2026-02-01', '2026-05-01'),
-        (? , 'تيك زون للأجهزة الذكية', 'info@techzone.eg', 'techzone', '+201122334455', ?, ?, '2026-03-01', '2026-09-01')
+        (?, 'سارة بوتيك للأزياء', 'sara@boutique.com', 'sara', '+201098765432', ?, ?, 51, 200, '2026-02-01', '2026-05-01'),
+        (?, 'تيك زون للأجهزة الذكية', 'info@techzone.eg', 'techzone', '+201122334455', ?, ?, 201, 500, '2026-03-01', '2026-09-01')
       ON DUPLICATE KEY UPDATE 
         \`password\` = VALUES(\`password\`),
-        \`package_id\` = VALUES(\`package_id\`);
+        \`package_id\` = VALUES(\`package_id\`),
+        \`orders_from\` = VALUES(\`orders_from\`),
+        \`orders_to\` = VALUES(\`orders_to\`);
     `, [
       userIds.sara, defaultHashedPassword, packageIds.pro,
       userIds.techzone, defaultHashedPassword, packageIds.growth,
     ]);
 
-    // 1.6 Central Orders & User Orders
+    // 1.5 Central Orders & User Orders
     console.log("   -> Seeding Central Orders & User Orders...");
     await connection.query(`
       CREATE TABLE IF NOT EXISTS \`orders\` (
@@ -244,17 +215,14 @@ async function runSeed() {
       CREATE TABLE IF NOT EXISTS \`user_orders\` (
         \`id\` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
         \`package_id\` CHAR(36) NOT NULL,
-        \`discount_id\` CHAR(36),
         \`price\` DECIMAL(10, 2) NOT NULL,
-        \`discount\` DECIMAL(10, 2) NOT NULL DEFAULT '0.00',
-        \`final_price\` DECIMAL(10, 2) NOT NULL,
         \`user_id\` CHAR(36) NOT NULL,
         \`status\` ENUM('pending', 'approve', 'reject') NOT NULL DEFAULT 'pending',
         \`reject_reason\` TEXT,
+        \`receipt\` VARCHAR(500),
         \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT \`fk_uo_package\` FOREIGN KEY (\`package_id\`) REFERENCES \`packages\` (\`id\`) ON DELETE RESTRICT,
-        CONSTRAINT \`fk_uo_discount\` FOREIGN KEY (\`discount_id\`) REFERENCES \`discounts\` (\`id\`) ON DELETE SET NULL,
         CONSTRAINT \`fk_uo_user\` FOREIGN KEY (\`user_id\`) REFERENCES \`users\` (\`id\`) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
@@ -268,16 +236,37 @@ async function runSeed() {
     `, [userIds.ahmed, userIds.sara, userIds.techzone]);
 
     await connection.query(`
-      INSERT INTO \`user_orders\` (\`id\`, \`package_id\`, \`discount_id\`, \`price\`, \`discount\`, \`final_price\`, \`user_id\`, \`status\`)
+      INSERT INTO \`user_orders\` (\`id\`, \`package_id\`, \`price\`, \`user_id\`, \`status\`)
       VALUES 
-        (UUID(), ?, NULL, 2499.00, 0.00, 2499.00, ?, 'approve'),
-        (UUID(), ?, ?, 799.00, 150.00, 649.00, ?, 'approve'),
-        (UUID(), ?, NULL, 1499.00, 0.00, 1499.00, ?, 'pending');
+        (UUID(), ?, 2499.00, ?, 'approve'),
+        (UUID(), ?, 799.00, ?, 'approve'),
+        (UUID(), ?, 1499.00, ?, 'pending');
     `, [
       packageIds.vip, userIds.ahmed,
-      packageIds.pro, discountIds.bonus150, userIds.sara,
+      packageIds.pro, userIds.sara,
       packageIds.growth, userIds.techzone,
     ]);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS \`wallet_orders\` (
+        \`id\` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+        \`wallet\` DECIMAL(10, 2) NOT NULL,
+        \`user_id\` CHAR(36) NOT NULL,
+        \`status\` ENUM('pending', 'approve', 'reject') NOT NULL DEFAULT 'pending',
+        \`reject_reason\` TEXT,
+        \`receipt\` VARCHAR(500),
+        \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT \`fk_wo_user\` FOREIGN KEY (\`user_id\`) REFERENCES \`users\` (\`id\`) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    await connection.query(`
+      INSERT INTO \`wallet_orders\` (\`id\`, \`wallet\`, \`user_id\`, \`status\`)
+      VALUES 
+        (UUID(), 500.00, ?, 'pending'),
+        (UUID(), 1000.00, ?, 'approve');
+    `, [userIds.ahmed, userIds.sara]);
 
     await connection.query("SET FOREIGN_KEY_CHECKS = 1;");
     console.log("✅ [PART 1 COMPLETE] Central Database seeded successfully!\n");

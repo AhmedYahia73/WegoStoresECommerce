@@ -1,8 +1,9 @@
-import { mysqlTable, char, varchar, date, timestamp } from "drizzle-orm/mysql-core";
+import { mysqlTable, char, varchar, date, int, decimal, timestamp } from "drizzle-orm/mysql-core";
 import { sql, relations } from "drizzle-orm";
 import { orders } from "./orders";
 import { packages } from "./packages";
 import { userOrders } from "./userOrders";
+import { walletOrders } from "./walletOrders";
 
 export const users = mysqlTable("users", {
   id: char("id", { length: 36 })
@@ -16,6 +17,9 @@ export const users = mysqlTable("users", {
   package_id: char("package_id", { length: 36 }).references(() => packages.id, {
     onDelete: "set null",
   }),
+  orders_from: int("orders_from").notNull().default(0),
+  orders_to: int("orders_to").default(0),
+  wallet: decimal("wallet", { precision: 10, scale: 2 }).notNull().default("0.00"),
   start_date: date("start_date", { mode: "string" }),
   end_date: date("end_date", { mode: "string" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -29,4 +33,5 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   orders: many(orders),
   userOrders: many(userOrders),
+  walletOrders: many(walletOrders),
 }));
