@@ -5,3 +5,4 @@ export * from "./admins";
 export * from "./orders";
 export * from "./userOrders";
 export * from "./walletOrders";
+export * from "./paymob";

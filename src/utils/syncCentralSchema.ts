@@ -11,7 +11,7 @@ export async function syncCentralSchema(connection: Connection, dbName: string):
     SELECT TABLE_NAME, COLUMN_NAME
     FROM INFORMATION_SCHEMA.COLUMNS
     WHERE TABLE_SCHEMA = ?
-      AND TABLE_NAME IN ('packages', 'users', 'user_orders', 'discounts')
+      AND TABLE_NAME IN ('packages', 'users', 'user_orders', 'wallet_orders', 'discounts')
     `,
     [dbName]
   );
@@ -123,9 +123,30 @@ export async function syncCentralSchema(connection: Connection, dbName: string):
         "ALTER TABLE `user_orders` ADD COLUMN `receipt` VARCHAR(500) NULL;"
       );
     }
+    if (!uoCols.has("transaction_id")) {
+      await connection.query(
+        "ALTER TABLE `user_orders` ADD COLUMN `transaction_id` VARCHAR(255) NULL;"
+      );
+    }
+    await connection.query(
+      "ALTER TABLE `user_orders` MODIFY COLUMN `status` ENUM('pending', 'approve', 'reject', 'faild') NOT NULL DEFAULT 'pending';"
+    );
   }
 
-  // 4. Drop obsolete central `discounts` table if present
+  // 4. Sync `wallet_orders`
+  const woCols = tableCols.get("wallet_orders");
+  if (woCols) {
+    if (!woCols.has("transaction_id")) {
+      await connection.query(
+        "ALTER TABLE `wallet_orders` ADD COLUMN `transaction_id` VARCHAR(255) NULL;"
+      );
+    }
+    await connection.query(
+      "ALTER TABLE `wallet_orders` MODIFY COLUMN `status` ENUM('pending', 'approve', 'reject', 'faild') NOT NULL DEFAULT 'pending';"
+    );
+  }
+
+  // 5. Drop obsolete central `discounts` table if present
   if (tableCols.has("discounts")) {
     await connection.query("DROP TABLE IF EXISTS `discounts`;");
   }

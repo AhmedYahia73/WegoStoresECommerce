@@ -713,6 +713,7 @@
 
 > جميع المسارات تتطلب `Authorization: Bearer <token>`.
 > عند الموافقة (`approve`) على الطلب، يتم ربط اليوزر بالباقة ونسخ `orders_from` و `orders_to` من الباقة مع تعيين `start_date = today` و `end_date = today + 1 month`.
+> الحقل `transaction_id` مخصص داخلياً لمدفوعات Paymob ولا يظهر في استجابات الجلب (`GET`)، والطلبات ذات الحالة `faild` مستبعدة تلقائياً من الجلب ولا تُقبل `faild` عبر endpoint تغيير الحالة اليدوي.
 
 ### 9.1 `GET /api/super_admin/user_orders`
 - **الشرح:** جلب جميع طلبات الباقات مع Pagination وفلاتر متعددة.
@@ -910,6 +911,7 @@
 
 > جميع المسارات تتطلب `Authorization: Bearer <token>`.
 > عند الموافقة (`approve`) يتم التحقق أن الطلب لم يُعتمد مسبقاً، ثم يُضاف مبلغ `wallet` إلى رصيد اليوزر (`users.wallet += order.wallet`) داخل Transaction.
+> الحقل `transaction_id` مخصص داخلياً لمدفوعات Paymob ولا يظهر في استجابات الجلب (`GET`)، والطلبات ذات الحالة `faild` مستبعدة تلقائياً من الجلب ولا تُقبل `faild` عبر endpoint تغيير الحالة اليدوي.
 
 ### 10.1 `GET /api/super_admin/wallet_orders`
 - **الشرح:** جلب جميع طلبات شحن المحفظة مع Pagination وفلاتر.
@@ -1074,3 +1076,67 @@
     }
   }
   ```
+
+---
+
+## 11. Paymob Settings — إعدادات Paymob (`/api/super_admin/paymob`)
+
+> جميع المسارات تتطلب `Authorization: Bearer <token>` (Super Admin).
+> هذا الـ endpoint يعمل بنظام السجل الواحد (Fetch + Upsert).
+
+### 11.1 `GET /api/super_admin/paymob`
+- **الشرح:** جلب إعدادات بوابة الدفع Paymob الحالية (أو `paymob: null` مع `callback_url` لو الجدول فارغ).
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Params:** `lang` (optional)
+- **Response (`200`):**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "paymob": {
+        "id": "uuid",
+        "name": "Paymob",
+        "names": { "ar": "باي موب", "en": "Paymob" },
+        "logo": "https://super.wegostores.com/uploads/...",
+        "api_key": "ZXlK...",
+        "iframe_id": "123456",
+        "integration_id": "654321",
+        "hmac": "ABCDEF...",
+        "type": "test",
+        "status": true,
+        "callback_url": "https://super.wegostores.com/api/paymob_callback",
+        "createdAt": "...",
+        "updatedAt": "..."
+      }
+    }
+  }
+  ```
+
+### 11.2 `POST /api/super_admin/paymob`
+- **الشرح:** إنشاء إعدادات Paymob لأول مرة إذا كان الجدول فارغاً (`201`)، أو تحديث الإعدادات الموجودة مباشرة (`200`).
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: multipart/form-data` (أو `application/json` مع URL لصورة `logo`)
+- **Body Fields:**
+  - `name`: كائن متعدد اللغات مثل `{"ar": "باي موب", "en": "Paymob"}` أو نص
+  - `logo`: ملف صورة (`multipart/form-data`) أو رابط URL (مطلوب عند الإنشاء الأول، اختياري عند التحديث)
+  - `api_key`: نص (مطلوب)
+  - `iframe_id`: نص أو رقم (مطلوب)
+  - `integration_id`: نص أو رقم (مطلوب)
+  - `hmac`: نص (مطلوب)
+  - `type`: `"test"` | `"live"` (افتراضي `"test"`)
+  - `status`: `boolean` (افتراضي `true`)
+  - `callback_url`: نص اختياري (افتراضي `"{subdomain}/api/paymob_callback"`)
+
+---
+
+## 12. Paymob Callback — استقبال إشعارات الدفع (`/api/paymob_callback`)
+
+> مسار عام (Public) يدعم `POST` (Webhook) و `GET` (Redirect)، ويتم التحقق منه عبر توقيع Paymob HMAC SHA-512.
+
+### 12.1 `POST /api/paymob_callback` & `GET /api/paymob_callback`
+- **آلية العمل:**
+  1. قراءة `hmac` المخزن من جدول `paymob` وحساب HMAC SHA-512 لبيانات المعاملة ومقارنته بتوقيع الطلب المرسل.
+  2. البحث عن الطلب باستخدام `transaction_id` (`id` الخاص بالمعاملة أو `order.id`) في جدول `user_orders` ثم جدول `wallet_orders`.
+  3. في حالة نجاح الدفع وسحب المبلغ (`success === true && !pending && !error_occured && !is_refunded && !is_voided`):
+     - إذا كان في `user_orders`: تحويل الحالة إلى `approve` وتفعيل الباقة للمستخدم (`package_id`, `orders_from`, `orders_to`, `upgrade_notified: false`, `start_date`, `end_date`).
+     - إذا كان في `wallet_orders`: تحويل الحالة إلى `approve` وزيادة رصيد المحفظة (`users.wallet += order.wallet`) داخل Transaction (بشكل آمن ضد التكرار Idempotent).
+  4. في حالة فشل الدفع (`!pending && (!success || error_occured)`): تحديث حالة الطلب إلى `faild` (إذا لم يكن معتمداً مسبقاً).

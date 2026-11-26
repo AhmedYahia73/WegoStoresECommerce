@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { db } from "../../models/db";
 import { walletOrders, users } from "../../models/schema";
-import { eq, and, gte, lte, inArray, sql, SQL } from "drizzle-orm";
+import { eq, ne, and, gte, lte, inArray, sql, SQL } from "drizzle-orm";
 import { NotFound, BadRequest } from "../../Errors";
 import { SuccessResponse } from "../../utils/response";
 import { getPaginationParams, buildPaginationMeta } from "../../utils/pagination";
@@ -12,7 +12,7 @@ export async function getAllWalletOrders(req: Request, res: Response) {
   const { page, limit, offset } = getPaginationParams(req);
   const { user_id, status, from, to } = req.query;
 
-  const conditions: SQL[] = [];
+  const conditions: SQL[] = [ne(walletOrders.status, "faild")];
 
   if (user_id && typeof user_id === "string") {
     conditions.push(eq(walletOrders.user_id, user_id));
@@ -98,7 +98,7 @@ export async function getWalletOrderById(req: Request, res: Response) {
     })
     .from(walletOrders)
     .leftJoin(users, eq(walletOrders.user_id, users.id))
-    .where(eq(walletOrders.id, id))
+    .where(and(eq(walletOrders.id, id), ne(walletOrders.status, "faild")))
     .limit(1);
 
   if (!row[0]) throw new NotFound("Wallet order not found");
@@ -124,6 +124,66 @@ export async function createWalletOrder(req: Request, res: Response) {
   });
 
   return SuccessResponse(res, { message: "Wallet order created successfully" }, 201);
+}
+
+// Shared helper to atomically approve a wallet order and credit the user's wallet
+export async function approveWalletOrderRecord(
+  order: typeof walletOrders.$inferSelect,
+  options?: { idempotent?: boolean }
+) {
+  return await db.transaction(async (tx) => {
+    const [latestOrder] = await tx
+      .select({ status: walletOrders.status })
+      .from(walletOrders)
+      .where(eq(walletOrders.id, order.id))
+      .limit(1);
+
+    if (!latestOrder) {
+      throw new NotFound("Wallet order not found");
+    }
+
+    if (latestOrder.status === "approve") {
+      if (options?.idempotent) {
+        const [userRow] = await tx
+          .select({ wallet: users.wallet })
+          .from(users)
+          .where(eq(users.id, order.user_id))
+          .limit(1);
+
+        return {
+          alreadyApproved: true,
+          user_wallet: userRow?.wallet,
+        };
+      }
+      throw new BadRequest("Wallet order is already approved");
+    }
+
+    await tx
+      .update(users)
+      .set({
+        wallet: sql`${users.wallet} + ${order.wallet}`,
+      })
+      .where(eq(users.id, order.user_id));
+
+    await tx
+      .update(walletOrders)
+      .set({
+        status: "approve",
+        reject_reason: null,
+      })
+      .where(eq(walletOrders.id, order.id));
+
+    const [userRow] = await tx
+      .select({ wallet: users.wallet })
+      .from(users)
+      .where(eq(users.id, order.user_id))
+      .limit(1);
+
+    return {
+      alreadyApproved: false,
+      user_wallet: userRow?.wallet,
+    };
+  });
 }
 
 // 5. Change Wallet Order Status (Approve or Reject)
@@ -162,34 +222,7 @@ export async function changeWalletOrderStatus(req: Request, res: Response) {
   }
 
   if (status === "approve") {
-    if (order.status === "approve") {
-      throw new BadRequest("Wallet order is already approved");
-    }
-
-    const updatedWallet = await db.transaction(async (tx) => {
-      await tx
-        .update(users)
-        .set({
-          wallet: sql`${users.wallet} + ${order.wallet}`,
-        })
-        .where(eq(users.id, order.user_id));
-
-      await tx
-        .update(walletOrders)
-        .set({
-          status: "approve",
-          reject_reason: null,
-        })
-        .where(eq(walletOrders.id, id));
-
-      const [userRow] = await tx
-        .select({ wallet: users.wallet })
-        .from(users)
-        .where(eq(users.id, order.user_id))
-        .limit(1);
-
-      return userRow?.wallet;
-    });
+    const { user_wallet: updatedWallet } = await approveWalletOrderRecord(order);
 
     return SuccessResponse(
       res,

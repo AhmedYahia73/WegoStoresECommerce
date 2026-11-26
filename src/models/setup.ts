@@ -112,9 +112,10 @@ async function createDatabaseAndTables() {
       \`package_id\` CHAR(36) NOT NULL,
       \`price\` DECIMAL(10, 2) NOT NULL,
       \`user_id\` CHAR(36) NOT NULL,
-      \`status\` ENUM('pending', 'approve', 'reject') NOT NULL DEFAULT 'pending',
+      \`status\` ENUM('pending', 'approve', 'reject', 'faild') NOT NULL DEFAULT 'pending',
       \`reject_reason\` TEXT,
       \`receipt\` VARCHAR(500),
+      \`transaction_id\` VARCHAR(255),
       \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       CONSTRAINT \`fk_user_orders_package\` FOREIGN KEY (\`package_id\`) REFERENCES \`packages\` (\`id\`) ON DELETE RESTRICT,
@@ -128,18 +129,38 @@ async function createDatabaseAndTables() {
       \`id\` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
       \`wallet\` DECIMAL(10, 2) NOT NULL,
       \`user_id\` CHAR(36) NOT NULL,
-      \`status\` ENUM('pending', 'approve', 'reject') NOT NULL DEFAULT 'pending',
+      \`status\` ENUM('pending', 'approve', 'reject', 'faild') NOT NULL DEFAULT 'pending',
       \`reject_reason\` TEXT,
       \`receipt\` VARCHAR(500),
+      \`transaction_id\` VARCHAR(255),
       \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       CONSTRAINT \`fk_wallet_orders_user\` FOREIGN KEY (\`user_id\`) REFERENCES \`users\` (\`id\`) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   `);
 
+  // Table 8: paymob
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS \`paymob\` (
+      \`id\` CHAR(36) NOT NULL DEFAULT (UUID()),
+      \`name\` JSON NOT NULL,
+      \`logo\` VARCHAR(500) NOT NULL,
+      \`api_key\` TEXT NOT NULL,
+      \`iframe_id\` VARCHAR(255) NOT NULL,
+      \`integration_id\` VARCHAR(255) NOT NULL,
+      \`hmac\` TEXT NOT NULL,
+      \`type\` ENUM('test', 'live') NOT NULL DEFAULT 'test',
+      \`status\` BOOLEAN NOT NULL DEFAULT true,
+      \`callback_url\` VARCHAR(500) DEFAULT '{subdomain}/api/paymob_callback',
+      \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `);
+
   await connection.query("SET FOREIGN_KEY_CHECKS = 1;");
 
-  console.log(`✓ All 7 central tables verified/created successfully in "${dbName}":`);
+  console.log(`✓ All 8 central tables verified/created successfully in "${dbName}":`);
   console.log(`  - admins`);
   console.log(`  - packages`);
   console.log(`  - payment_methods`);
@@ -147,6 +168,7 @@ async function createDatabaseAndTables() {
   console.log(`  - orders`);
   console.log(`  - user_orders`);
   console.log(`  - wallet_orders`);
+  console.log(`  - paymob`);
 
   await connection.end();
 }

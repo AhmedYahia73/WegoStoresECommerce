@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { db } from "../../models/db";
 import { userOrders, users, packages } from "../../models/schema";
-import { asc, eq, and, gte, lte, inArray, sql, SQL } from "drizzle-orm";
+import { asc, eq, ne, and, gte, lte, inArray, sql, SQL } from "drizzle-orm";
 import { NotFound, BadRequest } from "../../Errors";
 import { SuccessResponse } from "../../utils/response";
 import { getLocalizedText } from "../../utils/localization";
@@ -15,7 +15,7 @@ export async function getAllUserOrders(req: Request, res: Response) {
   const { page, limit, offset } = getPaginationParams(req);
   const { user_id, package_id, status, from, to } = req.query;
 
-  const conditions: SQL[] = [];
+  const conditions: SQL[] = [ne(userOrders.status, "faild")];
 
   if (user_id && typeof user_id === "string") {
     conditions.push(eq(userOrders.user_id, user_id));
@@ -156,7 +156,7 @@ export async function getUserOrderById(req: Request, res: Response) {
     .from(userOrders)
     .leftJoin(users, eq(userOrders.user_id, users.id))
     .leftJoin(packages, eq(userOrders.package_id, packages.id))
-    .where(eq(userOrders.id, id))
+    .where(and(eq(userOrders.id, id), ne(userOrders.status, "faild")))
     .limit(1);
 
   if (!row[0]) throw new NotFound("Order not found");
@@ -192,6 +192,72 @@ export async function createUserOrder(req: Request, res: Response) {
   });
 
   return SuccessResponse(res, { message: "User order created successfully" }, 201);
+}
+
+// Shared helper to approve a user order and activate the user's package subscription
+export async function approveUserOrderRecord(
+  order: typeof userOrders.$inferSelect,
+  options?: { idempotent?: boolean }
+) {
+  const pkgRows = await db
+    .select()
+    .from(packages)
+    .where(eq(packages.id, order.package_id))
+    .limit(1);
+
+  if (!pkgRows[0]) {
+    throw new NotFound("Associated package not found");
+  }
+
+  if (options?.idempotent && order.status === "approve") {
+    return {
+      alreadyApproved: true,
+      subscription: {
+        package_id: order.package_id,
+        orders_from: pkgRows[0].orders_from,
+        orders_to: pkgRows[0].orders_to,
+      },
+    };
+  }
+
+  const now = new Date();
+  const startDateStr = now.toISOString().split("T")[0];
+  const endDateStr = calculateSubscriptionEndDate(now);
+
+  await db.transaction(async (tx) => {
+    // 1. Update user: package_id, orders_from/to from package, start_date = now(), end_date = +1 month
+    await tx
+      .update(users)
+      .set({
+        package_id: order.package_id,
+        orders_from: pkgRows[0].orders_from,
+        orders_to: pkgRows[0].orders_to,
+        upgrade_notified: false,
+        start_date: startDateStr,
+        end_date: endDateStr,
+      })
+      .where(eq(users.id, order.user_id));
+
+    // 2. Update order status: approve
+    await tx
+      .update(userOrders)
+      .set({
+        status: "approve",
+        reject_reason: null,
+      })
+      .where(eq(userOrders.id, order.id));
+  });
+
+  return {
+    alreadyApproved: false,
+    subscription: {
+      package_id: order.package_id,
+      orders_from: pkgRows[0].orders_from,
+      orders_to: pkgRows[0].orders_to,
+      start_date: startDateStr,
+      end_date: endDateStr,
+    },
+  };
 }
 
 // 5. Change Order Status (Approve or Reject)
@@ -230,55 +296,14 @@ export async function changeUserOrderStatus(req: Request, res: Response) {
   }
 
   if (status === "approve") {
-    // Fetch package to calculate dates based on its type
-    const pkgRows = await db
-      .select()
-      .from(packages)
-      .where(eq(packages.id, order.package_id))
-      .limit(1);
-
-    if (!pkgRows[0]) {
-      throw new NotFound("Associated package not found");
-    }
-
-    const now = new Date();
-    const startDateStr = now.toISOString().split("T")[0];
-    const endDateStr = calculateSubscriptionEndDate(now);
-
-    // 1. Update user: package_id, orders_from/to from package, start_date = now(), end_date = +1 month
-    await db
-      .update(users)
-      .set({
-        package_id: order.package_id,
-        orders_from: pkgRows[0].orders_from,
-        orders_to: pkgRows[0].orders_to,
-        upgrade_notified: false,
-        start_date: startDateStr,
-        end_date: endDateStr,
-      })
-      .where(eq(users.id, order.user_id));
-
-    // 2. Update order status: approve
-    await db
-      .update(userOrders)
-      .set({
-        status: "approve",
-        reject_reason: null,
-      })
-      .where(eq(userOrders.id, id));
+    const { subscription } = await approveUserOrderRecord(order);
 
     return SuccessResponse(
       res,
       {
         message: "Order approved successfully and user subscription activated",
         status: "approve",
-        subscription: {
-          package_id: order.package_id,
-          orders_from: pkgRows[0].orders_from,
-          orders_to: pkgRows[0].orders_to,
-          start_date: startDateStr,
-          end_date: endDateStr,
-        },
+        subscription,
       },
       200
     );

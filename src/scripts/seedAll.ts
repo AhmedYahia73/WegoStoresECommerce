@@ -223,9 +223,10 @@ async function runSeed() {
         \`package_id\` CHAR(36) NOT NULL,
         \`price\` DECIMAL(10, 2) NOT NULL,
         \`user_id\` CHAR(36) NOT NULL,
-        \`status\` ENUM('pending', 'approve', 'reject') NOT NULL DEFAULT 'pending',
+        \`status\` ENUM('pending', 'approve', 'reject', 'faild') NOT NULL DEFAULT 'pending',
         \`reject_reason\` TEXT,
         \`receipt\` VARCHAR(500),
+        \`transaction_id\` VARCHAR(255),
         \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT \`fk_uo_package\` FOREIGN KEY (\`package_id\`) REFERENCES \`packages\` (\`id\`) ON DELETE RESTRICT,
@@ -258,9 +259,10 @@ async function runSeed() {
         \`id\` CHAR(36) PRIMARY KEY DEFAULT (UUID()),
         \`wallet\` DECIMAL(10, 2) NOT NULL,
         \`user_id\` CHAR(36) NOT NULL,
-        \`status\` ENUM('pending', 'approve', 'reject') NOT NULL DEFAULT 'pending',
+        \`status\` ENUM('pending', 'approve', 'reject', 'faild') NOT NULL DEFAULT 'pending',
         \`reject_reason\` TEXT,
         \`receipt\` VARCHAR(500),
+        \`transaction_id\` VARCHAR(255),
         \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT \`fk_wo_user\` FOREIGN KEY (\`user_id\`) REFERENCES \`users\` (\`id\`) ON DELETE CASCADE
@@ -273,6 +275,24 @@ async function runSeed() {
         (UUID(), 500.00, ?, 'pending'),
         (UUID(), 1000.00, ?, 'approve');
     `, [userIds.ahmed, userIds.sara]);
+
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS \`paymob\` (
+        \`id\` CHAR(36) NOT NULL DEFAULT (UUID()),
+        \`name\` JSON NOT NULL,
+        \`logo\` VARCHAR(500) NOT NULL,
+        \`api_key\` TEXT NOT NULL,
+        \`iframe_id\` VARCHAR(255) NOT NULL,
+        \`integration_id\` VARCHAR(255) NOT NULL,
+        \`hmac\` TEXT NOT NULL,
+        \`type\` ENUM('test', 'live') NOT NULL DEFAULT 'test',
+        \`status\` BOOLEAN NOT NULL DEFAULT true,
+        \`callback_url\` VARCHAR(500) DEFAULT '{subdomain}/api/paymob_callback',
+        \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (\`id\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
 
     await connection.query("SET FOREIGN_KEY_CHECKS = 1;");
     console.log("✅ [PART 1 COMPLETE] Central Database seeded successfully!\n");
