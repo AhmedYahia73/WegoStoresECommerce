@@ -1140,3 +1140,61 @@
      - إذا كان في `user_orders`: تحويل الحالة إلى `approve` وتفعيل الباقة للمستخدم (`package_id`, `orders_from`, `orders_to`, `upgrade_notified: false`, `start_date`, `end_date`).
      - إذا كان في `wallet_orders`: تحويل الحالة إلى `approve` وزيادة رصيد المحفظة (`users.wallet += order.wallet`) داخل Transaction (بشكل آمن ضد التكرار Idempotent).
   4. في حالة فشل الدفع (`!pending && (!success || error_occured)`): تحديث حالة الطلب إلى `faild` (إذا لم يكن معتمداً مسبقاً).
+
+---
+
+## 13. Orders Summary — ملخص طلبات التجار (`/api/super_admin/orders`)
+
+> جميع المسارات تتطلب `Authorization: Bearer <token>` (Super Admin).
+
+### 13.1 `GET /api/super_admin/orders`
+- **الشرح:** جلب إجمالي قيمة الطلبات (`SUM(orders.total)`) مجمّعاً لكل مستخدم (`user_id`) مع Pagination وفلاتر اختيارية.
+- **Headers:** `Authorization: Bearer <token>`
+- **Query Params:**
+  - `page` (optional, default `1`)
+  - `limit` (optional, default `10`)
+  - `user_id` (optional, uuid — لو فارغ أو `null` يعرض كل المستخدمين)
+  - `from` (optional, date/ISO string — لو فارغ أو `null` يبدأ من أول سجل)
+  - `to` (optional, date/ISO string — لو فارغ أو `null` ينتهي عند آخر سجل)
+- **Response (`200`):**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "orders": [
+        {
+          "user_id": "uuid",
+          "total_orders": 2450.5,
+          "name": "Ahmed Store",
+          "email": "ahmed@example.com",
+          "phone": "01000000000"
+        }
+      ],
+      "pagination": {
+        "total": 1,
+        "page": 1,
+        "limit": 10,
+        "totalPages": 1
+      }
+    }
+  }
+  ```
+
+### 13.2 `GET /api/super_admin/orders/lists`
+- **الشرح:** جلب قائمة المستخدمين المختصرة (`id`, `name`, `phone`) لاستخدامها في فلاتر الطلبات (متاح أيضاً عبر `GET /api/super_admin/users/select`).
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (`200`):**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "users": [
+        {
+          "id": "uuid",
+          "name": "Ahmed Store",
+          "phone": "01000000000"
+        }
+      ]
+    }
+  }
+  ```

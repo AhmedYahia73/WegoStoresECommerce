@@ -8,6 +8,7 @@ import packagesRouter from "./packages";
 import userOrdersRouter from "./userOrders";
 import walletOrdersRouter from "./walletOrders";
 import paymobRouter from "./paymob";
+import ordersRouter from "./orders";
 
 const router = Router();
 
@@ -20,6 +21,7 @@ router.use("/admins", adminsRouter);
 router.use("/payment_methods", paymentMethodsRouter);
 router.use("/users", usersRouter);
 router.use("/packages", packagesRouter);
+router.use("/orders", ordersRouter);
 router.use("/user_orders", userOrdersRouter);
 router.use("/wallet_orders", walletOrdersRouter);
 router.use("/paymob", paymobRouter);
