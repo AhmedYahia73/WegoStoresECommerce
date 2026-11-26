@@ -383,10 +383,10 @@
 ## 7. Packages (`/api/super_admin/packages`)
 
 > جميع المسارات تتطلب `Authorization: Bearer <token>`.
-> الحقول: `name` (JSON متعدد اللغات), `price`, `orders_from` (`int >= 0`), `orders_to` (`int >= orders_from` أو `null` لعدد غير محدود).
+> الحقول: `name` (JSON متعدد اللغات), `price`, `orders_from` (`int >= 0`), `orders_to` (`int >= orders_from` أو `null` لعدد غير محدود), `sort` (`int >= 0` — يتم الترتيب تصاعدياً `sort ASC` في جميع استعلامات الباقات).
 
 ### 7.1 `GET /api/super_admin/packages`
-- **الشرح:** جلب جميع الباقات مع Pagination وترجمة الاسم.
+- **الشرح:** جلب جميع الباقات مرتبة تصاعدياً حسب `sort` مع Pagination وترجمة الاسم.
 - **Headers:** `Authorization: Bearer <token>`
 - **Query Params:** `page`, `limit`, `lang` (optional, e.g. `ar` / `en`)
 - **Response (`200`):**
@@ -402,6 +402,7 @@
           "price": "299.00",
           "orders_from": 0,
           "orders_to": 50,
+          "sort": 1,
           "createdAt": "2026-01-01T00:00:00.000Z",
           "updatedAt": "2026-01-01T00:00:00.000Z"
         }
@@ -412,7 +413,7 @@
   ```
 
 ### 7.2 `GET /api/super_admin/packages/select`
-- **الشرح:** جلب الباقات بدون Pagination لاستخدامها في الـ Dropdowns.
+- **الشرح:** جلب الباقات بدون Pagination مرتبة تصاعدياً حسب `sort` لاستخدامها في الـ Dropdowns.
 - **Headers:** `Authorization: Bearer <token>`
 - **Query Params:** `lang` (optional)
 - **Response (`200`):**
@@ -426,7 +427,8 @@
           "name": "VIP Enterprise Package",
           "price": "2499.00",
           "orders_from": 501,
-          "orders_to": null
+          "orders_to": null,
+          "sort": 4
         }
       ]
     }
@@ -450,6 +452,7 @@
         "price": "299.00",
         "orders_from": 0,
         "orders_to": 50,
+        "sort": 1,
         "createdAt": "2026-01-01T00:00:00.000Z",
         "updatedAt": "2026-01-01T00:00:00.000Z"
       }
@@ -467,13 +470,15 @@
     "name": { "ar": "باقة الأعمال", "en": "Business Package" },
     "price": 999.00,
     "orders_from": 0,
-    "orders_to": null
+    "orders_to": null,
+    "sort": 1
   }
   ```
   - `name`: `Record<string, string>` (required, at least one non-empty language string)
   - `price`: `number >= 0` أو `string` بصيغة `^\d+(\.\d{1,2})?$` (required)
   - `orders_from`: `integer >= 0` (required)
   - `orders_to`: `integer >= 0` أو `null` (optional, default `null`؛ إذا كان رقم يجب أن يكون `>= orders_from`)
+  - `sort`: `integer >= 0` (required)
 - **Response (`201`):**
   ```json
   {
@@ -486,7 +491,7 @@
 - **الشرح:** تعديل باقة.
 - **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
 - **Path Params:** `id` (`uuid`, required)
-- **Body (all optional):** `name`, `price`, `orders_from`, `orders_to` (`integer >= 0 | null`)
+- **Body (all optional):** `name`, `price`, `orders_from`, `orders_to` (`integer >= 0 | null`), `sort` (`integer >= 0`)
 - **Response (`200`):**
   ```json
   {
@@ -587,7 +592,8 @@
           "name": "باقة المبتدئين",
           "price": "299.00",
           "orders_from": 0,
-          "orders_to": 50
+          "orders_to": 50,
+          "sort": 1
         }
       ]
     }
@@ -763,7 +769,8 @@
           "name": "باقة المبتدئين",
           "price": "299.00",
           "orders_from": 0,
-          "orders_to": 50
+          "orders_to": 50,
+          "sort": 1
         }
       ]
     }

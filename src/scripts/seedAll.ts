@@ -78,6 +78,7 @@ async function runSeed() {
         \`price\` DECIMAL(10, 2) NOT NULL,
         \`orders_from\` INT NOT NULL DEFAULT 0,
         \`orders_to\` INT NULL,
+        \`sort\` INT NOT NULL DEFAULT 0,
         \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -91,17 +92,18 @@ async function runSeed() {
     };
 
     await connection.query(`
-      INSERT INTO \`packages\` (\`id\`, \`name\`, \`price\`, \`orders_from\`, \`orders_to\`)
+      INSERT INTO \`packages\` (\`id\`, \`name\`, \`price\`, \`orders_from\`, \`orders_to\`, \`sort\`)
       VALUES 
-        (?, ?, 299.00, 0, 50),
-        (?, ?, 799.00, 51, 200),
-        (?, ?, 1499.00, 201, 500),
-        (?, ?, 2499.00, 501, NULL)
+        (?, ?, 299.00, 0, 50, 1),
+        (?, ?, 799.00, 51, 200, 2),
+        (?, ?, 1499.00, 201, 500, 3),
+        (?, ?, 2499.00, 501, NULL, 4)
       ON DUPLICATE KEY UPDATE 
         \`name\` = VALUES(\`name\`),
         \`price\` = VALUES(\`price\`),
         \`orders_from\` = VALUES(\`orders_from\`),
-        \`orders_to\` = VALUES(\`orders_to\`);
+        \`orders_to\` = VALUES(\`orders_to\`),
+        \`sort\` = VALUES(\`sort\`);
     `, [
       packageIds.starter, JSON.stringify({ ar: "باقة المبتدئين", en: "Starter Package" }),
       packageIds.pro, JSON.stringify({ ar: "باقة التجار المحترفين", en: "Professional Package" }),
@@ -154,6 +156,7 @@ async function runSeed() {
         \`orders_from\` INT NOT NULL DEFAULT 0,
         \`orders_to\` INT DEFAULT 0,
         \`orders\` INT NOT NULL DEFAULT 0,
+        \`upgrade_notified\` BOOLEAN NOT NULL DEFAULT 0,
         \`wallet\` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
         \`start_date\` DATE,
         \`end_date\` DATE,

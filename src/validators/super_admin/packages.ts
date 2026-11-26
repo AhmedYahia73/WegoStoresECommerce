@@ -26,6 +26,10 @@ export const createPackageSchema = z.object({
         .int("orders_from must be an integer")
         .min(0, "orders_from must be >= 0"),
       orders_to: nullableOrdersLimitSchema.optional().default(null),
+      sort: z.coerce
+        .number({ required_error: "sort is required" })
+        .int("sort must be an integer")
+        .min(0, "sort must be >= 0"),
     })
     .refine(
       (data) => data.orders_to === null || data.orders_to === undefined || data.orders_to >= data.orders_from,
@@ -50,6 +54,11 @@ export const updatePackageSchema = z.object({
         .min(0, "orders_from must be >= 0")
         .optional(),
       orders_to: nullableOrdersLimitSchema.optional(),
+      sort: z.coerce
+        .number()
+        .int("sort must be an integer")
+        .min(0, "sort must be >= 0")
+        .optional(),
     })
     .refine(
       (data) =>

@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { db } from "../../models/db";
 import { users, packages, orders } from "../../models/schema";
-import { eq, and, ne, inArray, sql } from "drizzle-orm";
+import { asc, eq, and, ne, inArray, sql } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import { ConflictError, NotFound } from "../../Errors";
 import { SuccessResponse } from "../../utils/response";
@@ -92,8 +92,10 @@ export async function getUsersLists(req: Request, res: Response) {
       price: packages.price,
       orders_from: packages.orders_from,
       orders_to: packages.orders_to,
+      sort: packages.sort,
     })
-    .from(packages);
+    .from(packages)
+    .orderBy(asc(packages.sort));
 
   const formattedPackages = packagesList.map((pkg) => ({
     id: pkg.id,
@@ -101,6 +103,7 @@ export async function getUsersLists(req: Request, res: Response) {
     price: pkg.price,
     orders_from: pkg.orders_from,
     orders_to: pkg.orders_to,
+    sort: pkg.sort,
   }));
 
   return SuccessResponse(res, { packages: formattedPackages }, 200);
@@ -325,6 +328,7 @@ export async function updateUser(req: Request, res: Response) {
       updateData.package_id = null;
       updateData.orders_from = 0;
       updateData.orders_to = 0;
+      updateData.upgrade_notified = false;
       updateData.start_date = null;
       updateData.end_date = null;
     } else {
@@ -336,6 +340,7 @@ export async function updateUser(req: Request, res: Response) {
       updateData.package_id = pkg[0].id;
       updateData.orders_from = pkg[0].orders_from;
       updateData.orders_to = pkg[0].orders_to;
+      updateData.upgrade_notified = false;
       updateData.start_date = now.toISOString().split("T")[0];
       updateData.end_date = calculateSubscriptionEndDate(now);
     }

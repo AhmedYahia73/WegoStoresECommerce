@@ -43,6 +43,11 @@ export async function syncCentralSchema(connection: Connection, dbName: string):
         "ALTER TABLE `packages` MODIFY COLUMN `orders_to` INT NULL;"
       );
     }
+    if (!pkgCols.has("sort")) {
+      await connection.query(
+        "ALTER TABLE `packages` ADD COLUMN `sort` INT NOT NULL DEFAULT 0;"
+      );
+    }
     if (pkgCols.has("type")) {
       await connection.query("ALTER TABLE `packages` DROP COLUMN `type`;");
     }
@@ -71,6 +76,11 @@ export async function syncCentralSchema(connection: Connection, dbName: string):
     if (!userCols.has("orders")) {
       await connection.query(
         "ALTER TABLE `users` ADD COLUMN `orders` INT NOT NULL DEFAULT 0;"
+      );
+    }
+    if (!userCols.has("upgrade_notified")) {
+      await connection.query(
+        "ALTER TABLE `users` ADD COLUMN `upgrade_notified` BOOLEAN NOT NULL DEFAULT 0;"
       );
     }
     if (!userCols.has("wallet")) {

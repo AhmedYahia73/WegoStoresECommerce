@@ -51,6 +51,7 @@ async function createDatabaseAndTables() {
       \`price\` DECIMAL(10, 2) NOT NULL,
       \`orders_from\` INT NOT NULL DEFAULT 0,
       \`orders_to\` INT NULL,
+      \`sort\` INT NOT NULL DEFAULT 0,
       \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
       \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -82,6 +83,7 @@ async function createDatabaseAndTables() {
       \`orders_from\` INT NOT NULL DEFAULT 0,
       \`orders_to\` INT DEFAULT 0,
       \`orders\` INT NOT NULL DEFAULT 0,
+      \`upgrade_notified\` BOOLEAN NOT NULL DEFAULT 0,
       \`wallet\` DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
       \`start_date\` DATE,
       \`end_date\` DATE,

@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { db } from "../../models/db";
 import { userOrders, users, packages } from "../../models/schema";
-import { eq, and, gte, lte, inArray, sql, SQL } from "drizzle-orm";
+import { asc, eq, and, gte, lte, inArray, sql, SQL } from "drizzle-orm";
 import { NotFound, BadRequest } from "../../Errors";
 import { SuccessResponse } from "../../utils/response";
 import { getLocalizedText } from "../../utils/localization";
@@ -109,8 +109,10 @@ export async function getUserOrdersLists(req: Request, res: Response) {
       price: packages.price,
       orders_from: packages.orders_from,
       orders_to: packages.orders_to,
+      sort: packages.sort,
     })
-    .from(packages);
+    .from(packages)
+    .orderBy(asc(packages.sort));
 
   const formattedPackages = packagesList.map((pkg) => ({
     id: pkg.id,
@@ -118,6 +120,7 @@ export async function getUserOrdersLists(req: Request, res: Response) {
     price: pkg.price,
     orders_from: pkg.orders_from,
     orders_to: pkg.orders_to,
+    sort: pkg.sort,
   }));
 
   return SuccessResponse(
@@ -249,6 +252,7 @@ export async function changeUserOrderStatus(req: Request, res: Response) {
         package_id: order.package_id,
         orders_from: pkgRows[0].orders_from,
         orders_to: pkgRows[0].orders_to,
+        upgrade_notified: false,
         start_date: startDateStr,
         end_date: endDateStr,
       })
