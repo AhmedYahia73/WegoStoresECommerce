@@ -9,6 +9,7 @@
     "generate-db": "npx drizzle-kit generate",
     "dbcreate": "tsx src/models/setup.ts",
     "migrate-db": "tsx src/models/setup.ts",
+    "db:migrate": "tsx src/models/setup.ts",
     "seed": "tsx src/scripts/seedAll.ts",
     "seed:fresh": "tsx src/scripts/seedAll.ts",
     "start:prod": "node dist/src/server.js",
