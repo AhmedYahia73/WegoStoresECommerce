@@ -11,6 +11,18 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME!,
   waitForConnections: true,
   connectionLimit: 10,
+  typeCast: function (field: any, next: () => any) {
+    if (field.type === "JSON") {
+      const val = field.string();
+      if (val === null) return null;
+      try {
+        return JSON.parse(val);
+      } catch {
+        return val;
+      }
+    }
+    return next();
+  },
   queueLimit: 0,
 });
 

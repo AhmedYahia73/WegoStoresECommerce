@@ -4,7 +4,7 @@ import { packages } from "../../models/schema";
 import { eq, inArray, sql } from "drizzle-orm";
 import { BadRequest, NotFound } from "../../Errors";
 import { SuccessResponse } from "../../utils/response";
-import { getLocalizedText } from "../../utils/localization";
+import { getLocalizedText, parseJsonIfNeeded } from "../../utils/localization";
 import { getPaginationParams, buildPaginationMeta } from "../../utils/pagination";
 
 // 1. Get All Packages (Paginated, localized name)
@@ -20,7 +20,7 @@ export async function getAllPackages(req: Request, res: Response) {
   const formatted = list.map((item) => ({
     id: item.id,
     name: getLocalizedText(item.name, lang),
-    names: item.name,
+    names: parseJsonIfNeeded(item.name),
     price: item.price,
     orders_from: item.orders_from,
     orders_to: item.orders_to,
@@ -74,7 +74,7 @@ export async function getPackageById(req: Request, res: Response) {
   const formatted = {
     id: row[0].id,
     name: getLocalizedText(row[0].name, lang),
-    names: row[0].name,
+    names: parseJsonIfNeeded(row[0].name),
     price: row[0].price,
     orders_from: row[0].orders_from,
     orders_to: row[0].orders_to,
@@ -90,7 +90,7 @@ export async function createPackage(req: Request, res: Response) {
   const { name, price, orders_from, orders_to } = req.body;
 
   await db.insert(packages).values({
-    name,
+    name: parseJsonIfNeeded(name),
     price: String(price),
     orders_from,
     orders_to: orders_to ?? null,
@@ -114,7 +114,7 @@ export async function updatePackage(req: Request, res: Response) {
   }
 
   const updateData: Partial<typeof packages.$inferInsert> = {};
-  if (name !== undefined) updateData.name = name;
+  if (name !== undefined) updateData.name = parseJsonIfNeeded(name);
   if (price !== undefined) updateData.price = String(price);
   if (orders_from !== undefined) updateData.orders_from = orders_from;
   if (orders_to !== undefined) updateData.orders_to = orders_to;
