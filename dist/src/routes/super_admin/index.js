@@ -14,6 +14,7 @@ const userOrders_1 = __importDefault(require("./userOrders"));
 const walletOrders_1 = __importDefault(require("./walletOrders"));
 const paymob_1 = __importDefault(require("./paymob"));
 const orders_1 = __importDefault(require("./orders"));
+const settings_1 = __importDefault(require("./settings"));
 const router = (0, express_1.Router)();
 // Public Super Admin Auth Route (Login via `admins` table)
 router.use("/auth", auth_1.default);
@@ -27,4 +28,5 @@ router.use("/orders", orders_1.default);
 router.use("/user_orders", userOrders_1.default);
 router.use("/wallet_orders", walletOrders_1.default);
 router.use("/paymob", paymob_1.default);
+router.use("/settings", settings_1.default);
 exports.default = router;

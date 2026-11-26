@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const settings_1 = require("../../controllers/super_admin/settings");
+const catchAsync_1 = require("../../utils/catchAsync");
+const validation_1 = require("../../middlewares/validation");
+const checkpermission_1 = require("../../middlewares/checkpermission");
+const settings_2 = require("../../validators/super_admin/settings");
+const router = (0, express_1.Router)();
+router.get("/", (0, checkpermission_1.checkOnlyAdmin)(), (0, catchAsync_1.catchAsync)(settings_1.getSettings));
+router.post("/", (0, checkpermission_1.checkOnlyAdmin)(), (0, validation_1.validate)(settings_2.upsertSettingsSchema), (0, catchAsync_1.catchAsync)(settings_1.upsertSettings));
+exports.default = router;

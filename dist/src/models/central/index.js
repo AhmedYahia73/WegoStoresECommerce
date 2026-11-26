@@ -22,3 +22,4 @@ __exportStar(require("./orders"), exports);
 __exportStar(require("./userOrders"), exports);
 __exportStar(require("./walletOrders"), exports);
 __exportStar(require("./paymob"), exports);
+__exportStar(require("./settings"), exports);

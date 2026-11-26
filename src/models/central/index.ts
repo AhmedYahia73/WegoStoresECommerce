@@ -6,3 +6,4 @@ export * from "./orders";
 export * from "./userOrders";
 export * from "./walletOrders";
 export * from "./paymob";
+export * from "./settings";

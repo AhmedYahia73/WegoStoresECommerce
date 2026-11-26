@@ -23,3 +23,4 @@ __exportStar(require("./central/orders"), exports);
 __exportStar(require("./central/userOrders"), exports);
 __exportStar(require("./central/walletOrders"), exports);
 __exportStar(require("./central/paymob"), exports);
+__exportStar(require("./central/settings"), exports);

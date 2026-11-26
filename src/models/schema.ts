@@ -7,3 +7,4 @@ export * from "./central/orders";
 export * from "./central/userOrders";
 export * from "./central/walletOrders";
 export * from "./central/paymob";
+export * from "./central/settings";

@@ -270,6 +270,15 @@ async function runSeed() {
         PRIMARY KEY (\`id\`)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+        await connection.query(`
+      CREATE TABLE IF NOT EXISTS \`settings\` (
+        \`id\` CHAR(36) NOT NULL DEFAULT (UUID()),
+        \`perimission_days\` INT NOT NULL DEFAULT 0,
+        \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (\`id\`)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
         await connection.query("SET FOREIGN_KEY_CHECKS = 1;");
         console.log("✅ [PART 1 COMPLETE] Central Database seeded successfully!\n");
         // =========================================================================

@@ -9,6 +9,7 @@ import userOrdersRouter from "./userOrders";
 import walletOrdersRouter from "./walletOrders";
 import paymobRouter from "./paymob";
 import ordersRouter from "./orders";
+import settingsRouter from "./settings";
 
 const router = Router();
 
@@ -25,5 +26,6 @@ router.use("/orders", ordersRouter);
 router.use("/user_orders", userOrdersRouter);
 router.use("/wallet_orders", walletOrdersRouter);
 router.use("/paymob", paymobRouter);
+router.use("/settings", settingsRouter);
 
 export default router;

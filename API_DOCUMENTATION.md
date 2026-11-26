@@ -1198,3 +1198,53 @@
     }
   }
   ```
+
+---
+
+## 14. Settings — الإعدادات العامة (`/api/super_admin/settings`)
+
+> جميع المسارات تتطلب `Authorization: Bearer <token>` (Super Admin).
+> يعمل بنظام السجل الواحد (Fetch First + Upsert).
+
+### 14.1 `GET /api/super_admin/settings`
+- **الشرح:** جلب أول سجل من جدول `settings` (أو `settings: null` إذا كان الجدول فارغاً).
+- **Headers:** `Authorization: Bearer <token>`
+- **Response (`200`):**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "settings": {
+        "id": "uuid",
+        "perimission_days": 7,
+        "createdAt": "...",
+        "updatedAt": "..."
+      }
+    }
+  }
+  ```
+
+### 14.2 `POST /api/super_admin/settings`
+- **الشرح:** إنشاء سجل الإعدادات إذا كان الجدول فارغاً (`201`)، أو تحديث السجل الموجود (`200`).
+- **Headers:** `Authorization: Bearer <token>`, `Content-Type: application/json`
+- **Body:**
+  ```json
+  {
+    "perimission_days": 7
+  }
+  ```
+- **Response (`200` / `201`):**
+  ```json
+  {
+    "success": true,
+    "data": {
+      "message": "Settings updated successfully",
+      "settings": {
+        "id": "uuid",
+        "perimission_days": 7,
+        "createdAt": "...",
+        "updatedAt": "..."
+      }
+    }
+  }
+  ```

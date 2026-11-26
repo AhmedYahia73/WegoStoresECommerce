@@ -158,9 +158,20 @@ async function createDatabaseAndTables() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   `);
 
+  // Table 9: settings
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS \`settings\` (
+      \`id\` CHAR(36) NOT NULL DEFAULT (UUID()),
+      \`perimission_days\` INT NOT NULL DEFAULT 0,
+      \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      \`updated_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (\`id\`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `);
+
   await connection.query("SET FOREIGN_KEY_CHECKS = 1;");
 
-  console.log(`✓ All 8 central tables verified/created successfully in "${dbName}":`);
+  console.log(`✓ All 9 central tables verified/created successfully in "${dbName}":`);
   console.log(`  - admins`);
   console.log(`  - packages`);
   console.log(`  - payment_methods`);
@@ -169,6 +180,7 @@ async function createDatabaseAndTables() {
   console.log(`  - user_orders`);
   console.log(`  - wallet_orders`);
   console.log(`  - paymob`);
+  console.log(`  - settings`);
 
   await connection.end();
 }
