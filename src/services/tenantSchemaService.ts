@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { pool } from "../models/db";
 
 export interface TableColumnDef {
@@ -779,6 +780,69 @@ export async function createTenantSchema(subdomain: string): Promise<void> {
   } catch (error) {
     console.error(`Error creating schema for subdomain "${subdomain}":`, error);
     throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+/**
+ * 1b. Seed the initial store owner admin inside `<subdomain>.admin` using the default `admin` role.
+ */
+export interface TenantOwnerAdminInput {
+  name: string;
+  email: string;
+  phone: string;
+  hashedPassword: string;
+}
+
+export interface CreatedTenantAdmin {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role_id: string;
+  role_name: string;
+  status: boolean;
+}
+
+export async function seedTenantOwnerAdmin(
+  subdomain: string,
+  input: TenantOwnerAdminInput
+): Promise<CreatedTenantAdmin> {
+  const connection = await pool.getConnection();
+
+  try {
+    const [roleRows] = (await connection.query(
+      `SELECT \`id\` FROM \`${subdomain}\`.\`role\` WHERE \`name\` = 'admin' LIMIT 1;`
+    )) as any[];
+
+    let adminRoleId: string = roleRows?.[0]?.id;
+    if (!adminRoleId) {
+      adminRoleId = crypto.randomUUID();
+      await connection.query(
+        `INSERT INTO \`${subdomain}\`.\`role\` (\`id\`, \`name\`) VALUES (?, 'admin');`,
+        [adminRoleId]
+      );
+    }
+
+    const adminId = crypto.randomUUID();
+    await connection.query(
+      `
+      INSERT INTO \`${subdomain}\`.\`admin\` (\`id\`, \`name\`, \`email\`, \`phone\`, \`password\`, \`role_id\`, \`status\`)
+      VALUES (?, ?, ?, ?, ?, ?, 1);
+      `,
+      [adminId, input.name, input.email, input.phone, input.hashedPassword, adminRoleId]
+    );
+
+    return {
+      id: adminId,
+      name: input.name,
+      email: input.email,
+      phone: input.phone,
+      role_id: adminRoleId,
+      role_name: "admin",
+      status: true,
+    };
   } finally {
     connection.release();
   }

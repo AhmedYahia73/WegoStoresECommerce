@@ -6,6 +6,7 @@ import bcrypt from "bcrypt";
 import { generateAdminToken } from "../../utils/auth";
 import { UnauthorizedError } from "../../Errors";
 import { SuccessResponse } from "../../utils/response";
+import { provisionTenantUser } from "../../services/tenantProvisionService";
 
 export async function login(req: Request, res: Response) {
   const { email, password } = req.body;
@@ -55,5 +56,40 @@ export async function hash_password(req: Request, res: Response) {
       password: await bcrypt.hash(password, 10),
     },
     200
+  );
+}
+
+/**
+ * Public Tenant Signup:
+ * - Creates a central `users` record with `api-<subdomain>` and starter package (`sort = 1`)
+ * - Automatically sets `orders_from`, `orders_to`, `orders = 0`, `wallet = 0`, `start_date`, `end_date`
+ * - Creates the tenant MySQL schema and seeds the owner account in `<schema>.admin`
+ * - Returns a JWT token compatible with TenantECommerce `/api/sub_admin/*` endpoints
+ */
+export async function signup(req: Request, res: Response) {
+  const { name, email, subdomain, phone, password } = req.body;
+
+  const { subdomain: apiSubdomain, admin, user } = await provisionTenantUser(
+    { name, email, subdomain, phone, password },
+    { useDefaultStarterPackage: true }
+  );
+
+  const token = generateAdminToken({
+    id: admin.id,
+    name: admin.name,
+    email: admin.email,
+    phone: admin.phone,
+  });
+
+  return SuccessResponse(
+    res,
+    {
+      message: "Tenant registered successfully",
+      token,
+      subdomain: apiSubdomain,
+      admin,
+      user,
+    },
+    201
   );
 }

@@ -8,8 +8,9 @@ import { SuccessResponse } from "../../utils/response";
 import { getPaginationParams, buildPaginationMeta } from "../../utils/pagination";
 import { getLocalizedText, parseJsonIfNeeded } from "../../utils/localization";
 import { calculateSubscriptionEndDate } from "../../utils/subscription";
+import { formatApiSubdomain, stripApiPrefix } from "../../utils/subdomain";
+import { provisionTenantUser } from "../../services/tenantProvisionService";
 import {
-  createTenantSchema,
   renameTenantSchema,
   deleteTenantSchema,
 } from "../../services/tenantSchemaService";
@@ -174,86 +175,24 @@ export async function getUserById(req: Request, res: Response) {
 export async function createUser(req: Request, res: Response) {
   const { name, email, subdomain, phone, password, package_id, wallet } = req.body;
 
-  const existingEmail = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
-  if (existingEmail[0]) {
-    throw new ConflictError("Email already exists");
-  }
-
-  const existingSubdomain = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.subdomain, subdomain))
-    .limit(1);
-  if (existingSubdomain[0]) {
-    throw new ConflictError("Subdomain already exists");
-  }
-
-  const existingPhone = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.phone, phone))
-    .limit(1);
-  if (existingPhone[0]) {
-    throw new ConflictError("Phone already exists");
-  }
-
-  // Handle subscription & orders limits automatically from package_id (default 0 if no package)
-  let calculatedStartDate: string | null = null;
-  let calculatedEndDate: string | null = null;
-  let calculatedOrdersFrom = 0;
-  let calculatedOrdersTo: number | null = 0;
-
-  if (package_id) {
-    const pkg = await db.select().from(packages).where(eq(packages.id, package_id)).limit(1);
-    if (!pkg[0]) {
-      throw new NotFound("Selected package not found");
-    }
-    const now = new Date();
-    calculatedStartDate = now.toISOString().split("T")[0];
-    calculatedEndDate = calculateSubscriptionEndDate(now);
-    calculatedOrdersFrom = pkg[0].orders_from;
-    calculatedOrdersTo = pkg[0].orders_to;
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  // 1. Insert user into central users table
-  await db.insert(users).values({
+  const { subdomain: apiSubdomain } = await provisionTenantUser({
     name,
     email,
     subdomain,
     phone,
-    password: hashedPassword,
-    package_id: package_id ?? null,
-    orders_from: calculatedOrdersFrom,
-    orders_to: calculatedOrdersTo,
-    wallet: String(wallet ?? 0),
-    start_date: calculatedStartDate,
-    end_date: calculatedEndDate,
+    password,
+    package_id,
+    wallet,
   });
 
-  // 2. Automatically create tenant wildcard MySQL schema with all 22 tables & initial data
-  try {
-    await createTenantSchema(subdomain);
-  } catch (schemaError) {
-    try {
-      await db.delete(users).where(eq(users.subdomain, subdomain));
-    } catch (cleanupUserErr) {
-      console.error(`Rollback: Failed to delete user "${subdomain}":`, cleanupUserErr);
-    }
-    try {
-      await deleteTenantSchema(subdomain);
-    } catch (cleanupSchemaErr) {
-      console.error(`Rollback: Failed to drop schema "${subdomain}":`, cleanupSchemaErr);
-    }
-    throw schemaError;
-  }
-
-  return SuccessResponse(res, { message: "User and tenant schema created successfully" }, 201);
+  return SuccessResponse(
+    res,
+    {
+      message: "User and tenant schema created successfully",
+      subdomain: apiSubdomain,
+    },
+    201
+  );
 }
 
 // 6. Update User
@@ -284,13 +223,23 @@ export async function updateUser(req: Request, res: Response) {
   }
 
   const oldSubdomain = existingUser[0].subdomain;
-  const isSubdomainChanged = subdomain && subdomain !== oldSubdomain;
+  const normalizedSubdomain =
+    subdomain !== undefined ? formatApiSubdomain(subdomain) : undefined;
+  const isSubdomainChanged = Boolean(
+    normalizedSubdomain && normalizedSubdomain !== oldSubdomain
+  );
 
-  if (isSubdomainChanged) {
+  if (isSubdomainChanged && normalizedSubdomain) {
+    const baseSubdomain = stripApiPrefix(normalizedSubdomain);
     const subdomainTaken = await db
       .select({ id: users.id })
       .from(users)
-      .where(and(eq(users.subdomain, subdomain), ne(users.id, id)))
+      .where(
+        and(
+          inArray(users.subdomain, [normalizedSubdomain, baseSubdomain]),
+          ne(users.id, id)
+        )
+      )
       .limit(1);
 
     if (subdomainTaken[0]) {
@@ -313,7 +262,7 @@ export async function updateUser(req: Request, res: Response) {
   const updateData: Partial<typeof users.$inferInsert> = {};
   if (name !== undefined) updateData.name = name;
   if (email !== undefined) updateData.email = email;
-  if (subdomain !== undefined) updateData.subdomain = subdomain;
+  if (normalizedSubdomain !== undefined) updateData.subdomain = normalizedSubdomain;
   if (phone !== undefined) updateData.phone = phone;
   if (password !== undefined) {
     updateData.password = await bcrypt.hash(password, 10);
@@ -347,8 +296,8 @@ export async function updateUser(req: Request, res: Response) {
   }
 
   // If subdomain changed, rename the MySQL database / schema
-  if (isSubdomainChanged) {
-    await renameTenantSchema(oldSubdomain, subdomain);
+  if (isSubdomainChanged && normalizedSubdomain) {
+    await renameTenantSchema(oldSubdomain, normalizedSubdomain);
   }
 
   if (Object.keys(updateData).length > 0) {
